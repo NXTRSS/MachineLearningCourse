@@ -46,8 +46,8 @@ Ta nazwa w nawiasie to właśnie nazwa naszego środowiska python - w tej sytuac
 Stwórzmy nowe foldery aby łatwiej poruszać się po plikach:
 ```bash
 cd ~
-mkdir WSB/ml/codes -p
-cd WSB/ml/codes
+mkdir WSB/ml -p
+cd WSB/ml
 ```
 Teraz do folderu ściągnijmy pliki z GitHub potrzebne podczas zajęć
 ```bash
@@ -57,6 +57,8 @@ git clone https://github.com/NXTRSS/MachineLearningCourse
 ## Stworzenie środowiska python
 Jeśli ściągnięcie plików przebiegło poprawnie w naszym folderze powinien znajdować się plik *environment.yaml* i za jego pomocą stworzymy nowe środowisko pythonowe o nazwie **ml**:
 ```bash
+cd MachineLearningCourse
+
 conda env create -f environment.yaml
 
 conda activate ml
@@ -74,7 +76,7 @@ python -m ipykernel install --user --name ml --display-name "Python (ml)”
 ## Rozpoczęcie (oraz wznowienie pracy)
 Przy każdym wznowieniu pracy (ponownym odpaleniu komputera i maszyny wirtualnej) proszę wejście do odpowiedniego folderu:
 ```bash
-cd WSB/ml/codes
+cd WSB/ml/MachineLearningCourse
 ```
  zaktywować środowisko o nazwie *ml*:
 ```bash
