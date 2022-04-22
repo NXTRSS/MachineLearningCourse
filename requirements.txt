@@ -1,0 +1,15 @@
+  # python==3.9.7
+  tensorflow==2.4
+  opencv==4.5.2
+  keras==2.4.3
+  pandas=1.4.1
+  seaborn==0.11.2
+  scikit-learn==1.0.2
+  plotly==5.1.0
+  sweetviz==2.1.3
+  pyaescrypt==6.0.0
+  pydot==1.4.2
+  graphviz==2.40.1
+  jupyter_contrib_nbextensions==0.5.1
+  ipywidgets==7.6.5
+  jupyter==1.0.0
