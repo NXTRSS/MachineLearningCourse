@@ -24,13 +24,13 @@ def decrypt_file(file_path, password):
     return fDec
 
 
-def decrypt_pandas(file_path, password):        
+def decrypt_pandas(file_path, password, sep=','):        
     fDec = decrypt_file(file_path, password)
 
     s=str(fDec.getvalue(),'utf-8')
 
     data = io.StringIO(s) 
-    return pd.read_table(data, sep=',')
+    return pd.read_table(data, sep=sep)
 
 
 def decrypt_pickle(file_path, password):
