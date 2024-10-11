@@ -1,4 +1,4 @@
-# Zajęcia z Uczenia Maszynowego WSB
+# Zajęcia z Uczenia Maszynowego
 
 Poniżej przedstawiam instrukcję niezbędnych kroków do wykonania przed zajęciami
 
