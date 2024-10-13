@@ -46,7 +46,7 @@ Ta nazwa w nawiasie to właśnie nazwa naszego środowiska python - w tej sytuac
 Stwórzmy nowe foldery aby łatwiej poruszać się po plikach:
 ```bash
 cd ~
-mkdir MachineLearningCodes/ml -p
+mkdir -p MachineLearningCodes/ml
 cd MachineLearningCodes/ml
 ```
 Teraz do folderu ściągnijmy pliki z GitHub potrzebne podczas zajęć
