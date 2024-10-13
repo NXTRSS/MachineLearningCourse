@@ -76,7 +76,7 @@ python -m ipykernel install --user --name ml --display-name "Python (ml)”
 ## Rozpoczęcie (oraz wznowienie pracy)
 Przy każdym wznowieniu pracy (ponownym odpaleniu komputera i maszyny wirtualnej) proszę wejście do odpowiedniego folderu:
 ```bash
-cd WSB/ml/MachineLearningCourse
+cd MachineLearningCodes/MachineLearningCourse
 ```
  zaktywować środowisko o nazwie *ml*:
 ```bash
