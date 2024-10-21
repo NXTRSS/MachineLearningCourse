@@ -11,8 +11,7 @@ dependencies:
   - plotly=5.1.0
   - pydot=1.4.2
   - graphviz=2.40.1
-  - jupyter=1.0.0
-  - ipywidgets=8.1.2
+  - jupyterlab=4.2.5
   - pip
   - pip:
       - tensorflow==2.10
