@@ -6,15 +6,15 @@ dependencies:
   - python=3.9.7
   - opencv=4.5.2
   - pandas=1.4.1
-  - seaborn=0.11.2
   - scikit-learn=1.0.2
+  - seaborn=0.11.2
   - plotly=5.1.0
   - pydot=1.4.2
   - graphviz=2.40.1
   - jupyterlab=4.2.5
+  - matplotlib=3.4.3
+  - ipywidgets=8.1.2
   - pip
   - pip:
       - tensorflow==2.10
       - keras==2.10.0
-      - sweetviz==2.1.3
-      - pyaescrypt==6.0.0  # Installed via pip
