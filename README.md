@@ -83,7 +83,7 @@ Po aktywacji nowego środowiska zamiast *base* powinno być widoczne *ml* w nasz
 Proszę wywołać poniższe linijki aby aktywować kilka dodatkowych ustawień:
 ```bash
 jupyter nbextension enable codefolding/edit
-python -m ipykernel install --user --name ml --display-name "Python (ml)”
+python -m ipykernel install --user --name ml --display-name "Python (ml)"
 ```
 ## Rozpoczęcie (oraz wznowienie pracy)
 Przy każdym wznowieniu pracy (ponownym odpaleniu komputera i maszyny wirtualnej) proszę wejście do odpowiedniego folderu:
