@@ -66,7 +66,7 @@ conda env create -f environment.yaml
 conda activate ml
 ```
 **Jeśli powyższe komendy nie są w stanie być wykonane polecam uruchomić poniższe:**\
-Można też posiłkować się paczkami i wersjami zawartymi w plikach environment.yaml oraz requirements.txt (w szczególności gdy ktoś korzysta z venv zamiast z condy)
+<small> *Można też posiłkować się paczkami i wersjami zawartymi w plikach environment.yaml oraz requirements.txt (w szczególności gdy ktoś korzysta z venv zamiast z condy)* </small>
 ```bash
 conda update -n base -c defaults conda -y
 
@@ -99,5 +99,7 @@ A następnie wywołać narzędzie **Jupyter Notebook**, które jest webową apli
 jupyter notebook
 ```
 Po aktywacji powyższej komendy otworzy się przeglądarka a w niej nasze pliki.\
+
 **Ważne: w narzędziu Jupyter Notebook do uruchamiania przygotowanych skryptów trzeba będzie "wyklikać" kernel *Python (ml)* - będzie to pokazane na zajęciach.**\
+
 Do działania plików niezbędne będą również zbiory danych - umieszczone na dysku Google
