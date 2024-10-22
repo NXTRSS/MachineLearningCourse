@@ -72,7 +72,7 @@ conda update -n base -c defaults conda -y
 
 conda create -n ml python=3.9.7 -y
 conda activate ml
-pip install tensorflow==2.10 keras==2.10
+pip install tensorflow==2.13 keras==2.13
 conda install opencv=4.5.2 pandas=1.4.1 scikit-learn=1.0.2 -y 
 conda install seaborn=0.11.2 plotly=5.1.0 pydot=1.4.2 graphviz=2.40.1 jupyterlab=4.2.5 matplotlib=3.4.3 ipywidgets=8.1.2 -y
 ```
