@@ -65,7 +65,7 @@ conda env create -f environment.yaml
 
 conda activate ml
 ```
-Jesli powyzsze komendy nie sa w stanie byc wykonane polecam uruchomic ponizsze:
+**Jeśli powyższe komendy nie są w stanie być wykonane polecam uruchomić poniższe:**\
 ```bash
 conda update -n base -c defaults conda -y
 
@@ -82,7 +82,6 @@ Po aktywacji nowego środowiska zamiast *base* powinno być widoczne *ml* w nasz
 **Proszę pamiętać aby zawsze aktywować to środowisko po wznowieniu pracy na komputerze!**\
 Proszę wywołać poniższe linijki aby aktywować kilka dodatkowych ustawień:
 ```bash
-jupyter nbextension enable codefolding/edit
 python -m ipykernel install --user --name ml --display-name "Python (ml)"
 ```
 ## Rozpoczęcie (oraz wznowienie pracy)
