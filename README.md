@@ -65,7 +65,8 @@ conda env create -f environment.yaml
 
 conda activate ml
 ```
-**Jeśli powyższe komendy nie są w stanie być wykonane polecam uruchomić poniższe:**\
+**Jeśli powyższe komendy nie są w stanie być wykonane polecam uruchomić poniższe:**
+Można też posiłkować się paczkami i wersjami zawartymi w plikach environment.yaml oraz requirements.txt (w szczególności gdy ktoś korzysta z venv zamiast z condy)
 ```bash
 conda update -n base -c defaults conda -y
 
