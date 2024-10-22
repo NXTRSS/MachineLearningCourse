@@ -59,9 +59,21 @@ Jeśli ściągnięcie plików przebiegło poprawnie w naszym folderze powinien z
 ```bash
 cd MachineLearningCourse
 
+conda update -n base -c defaults conda -y
+
 conda env create -f environment.yaml
 
 conda activate ml
+```
+Jesli powyzsze komendy nie sa w stanie byc wykonane polecam uruchomic ponizsze:
+```bash
+conda update -n base -c defaults conda -y
+
+conda create -n ml python=3.9.7 -y
+conda activate ml
+pip install tensorflow==2.10 keras==2.10
+conda install opencv=4.5.2 pandas=1.4.1 scikit-learn=1.0.2 -y 
+conda install seaborn=0.11.2 plotly=5.1.0 pydot=1.4.2 graphviz=2.40.1 jupyterlab=4.2.5 matplotlib=3.4.3 ipywidgets=8.1.2 -y
 ```
 Po aktywacji nowego środowiska zamiast *base* powinno być widoczne *ml* w naszym terminalu (przykład):
 ```bash
