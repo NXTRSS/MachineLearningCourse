@@ -2,7 +2,6 @@ import sys
 import subprocess
 from importlib.metadata import version, PackageNotFoundError
 
-# Define the required packages and their expected versions
 required_packages = {
     "tensorflow": "2.15.0",
     "pillow": "9.4.0",
@@ -16,7 +15,6 @@ required_packages = {
     "ipywidgets": "8.1.2",
 }
 
-# Check Python version
 print("Checking Python version...\n")
 python_version = sys.version_info
 expected_python_version = (3, 9, 7)
@@ -25,7 +23,6 @@ if (python_version.major, python_version.minor, python_version.micro) == expecte
 else:
     print(f"WARNING: Python Version: {'.'.join(map(str, python_version[:3]))} (Expected: {'.'.join(map(str, expected_python_version))})")
 
-# Function to check package versions using importlib.metadata
 def check_package(package_name, expected_version):
     try:
         installed_version = version(package_name)
@@ -36,7 +33,6 @@ def check_package(package_name, expected_version):
     except PackageNotFoundError:
         print(f"ERROR: Package {package_name}: NOT INSTALLED")
 
-# Function to check system-level packages like graphviz (installed via conda)
 def check_system_package(package_name):
     try:
         result = subprocess.run(["conda", "list", package_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -47,16 +43,13 @@ def check_system_package(package_name):
     except FileNotFoundError:
         print(f"ERROR: Conda not found. Could not check system-level package {package_name}.")
 
-# Check installed packages via importlib.metadata
 print("\nChecking installed packages...\n")
 for package, expected_version in required_packages.items():
     check_package(package, expected_version)
 
-# Now check system-level packages (e.g., graphviz installed via conda)
 print("\nChecking system-level packages...\n")
 check_system_package("graphviz")
 
-# Final check
 print("\nEnvironment verification: ", end="")
 all_ok = True
 for package, expected_version in required_packages.items():
