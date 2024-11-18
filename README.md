@@ -158,8 +158,8 @@ Some packages have mismatched versions. While the environment is functional, it 
 
 ### Co zrobić gdy nadal nie można prawidłowo stworzyć środowiska?
 W takiej sytuacji na zajęciach będzie można:
-1. Otworzyć Jupyter Notebook w Colab - wystarczy otworzyć nasz Google Drive i otworzyć plik .ipynb za pomocą Colab
-2. Otworzyć instację w MyBinder: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/NXTRSS/MachineLearningCourse/HEAD)
+1. Otworzyć instację w MyBinder: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/NXTRSS/MachineLearningCourse/HEAD)
+2. Otworzyć Jupyter Notebook w Colab - wystarczy otworzyć nasz Google Drive i otworzyć plik .ipynb za pomocą Colab
 
 ## Rozpoczęcie (oraz wznowienie pracy)
 Przy każdym wznowieniu pracy (ponownym odpaleniu komputera i maszyny wirtualnej) proszę wejście do odpowiedniego folderu:
