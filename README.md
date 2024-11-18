@@ -98,7 +98,9 @@ Aby upewnić się, że środowisko Pythonowe zostało skonfigurowane poprawnie, 
    python verify_env.py
    ```
 3. Skrypt sprawdzi wersję Pythona oraz dostępność wymaganych bibliotek. Jeśli wszystko zostało zainstalowane poprawnie, skrypt wyświetli komunikat: `Environment verification: OK.`
+   
    Przykładowy zwrot z terminala po uruchomieniu skryptu:
+   
    ```bash
    (ml) kamil@ubuntu:~/MachineLearningCodes/MachineLearningCourse$ python verify_env.py
 
@@ -125,7 +127,33 @@ Aby upewnić się, że środowisko Pythonowe zostało skonfigurowane poprawnie, 
 
    Environment verification: OK
    ```
-Jeśli pojawią się błędy lub ostrzeżenia, skrypt wskaże brakujące paczki lub niezgodności w wersjach. Proszę upewnić się, że wszystkie wymagane pakiety zostały zainstalowane zgodnie z instrukcjami.
+Jeśli pojawią się błędy lub ostrzeżenia, skrypt wskaże brakujące paczki lub niezgodności w wersjach. Proszę upewnić się, że wszystkie wymagane pakiety zostały zainstalowane zgodnie z instrukcjami. Oczywiście jest szansa, że paczka w innej wersji będzie działała, lecz nie ma pewności. Przy złej wersji zwrot z terminala mógłby wyglądać tak:
+```bash
+Checking Python version...
+
+WARNING: Python Version: 3.9.10 (Expected: 3.9.7)
+
+Checking installed packages...
+
+Package tensorflow: OK (Version 2.15.0)
+Package pillow: WARNING (Installed Version: 9.3.0, Expected: 9.4.0)
+Package pandas: OK (Version 1.4.1)
+Package scikit-learn: OK (Version 1.0.2)
+Package seaborn: WARNING (Installed Version: 0.11.1, Expected: 0.11.2)
+Package plotly: OK (Version 5.1.0)
+Package pydot: OK (Version 1.4.2)
+Package jupyterlab: OK (Version 4.2.5)
+Package matplotlib: OK (Version 3.4.3)
+Package ipywidgets: OK (Version 8.1.2)
+
+Checking system-level packages...
+
+Package graphviz: OK (Installed via conda)
+
+Environment verification: WARNINGS DETECTED.
+
+Some packages have mismatched versions. While the environment is functional, it is recommended to align package versions to ensure consistency.
+```
 
 ## Rozpoczęcie (oraz wznowienie pracy)
 Przy każdym wznowieniu pracy (ponownym odpaleniu komputera i maszyny wirtualnej) proszę wejście do odpowiedniego folderu:
