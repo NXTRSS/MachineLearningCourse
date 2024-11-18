@@ -165,9 +165,9 @@ cd MachineLearningCodes/MachineLearningCourse
 ```bash
 conda activate ml
 ```
-A następnie wywołać narzędzie **Jupyter Notebook**, które jest webową aplikacją, na której będziemy pracować na naszych zajęciach:
+A następnie wywołać narzędzie **Jupyter Notebook** w ramach **Jupyter Lab**, które jest webową aplikacją, na której będziemy pracować na naszych zajęciach:
 ```bash
-jupyter notebook
+jupyter lab
 ```
 Po aktywacji powyższej komendy otworzy się przeglądarka a w niej nasze pliki.
 
