@@ -73,7 +73,7 @@ conda update -n base -c defaults conda -y
 conda create -n ml python=3.9.7 -y
 conda activate ml
 pip install tensorflow==2.15
-conda install pillow==9.4.0 pandas=1.4.1 scikit-learn=1.0.2 -y 
+conda install pillow=9.4.0 pandas=1.4.1 scikit-learn=1.0.2 -y 
 conda install seaborn=0.11.2 plotly=5.1.0 pydot=1.4.2 graphviz=2.40.1 jupyterlab=4.2.5 matplotlib=3.4.3 ipywidgets=8.1.2 -y
 ```
 Po aktywacji nowego środowiska zamiast *base* powinno być widoczne *ml* w naszym terminalu (przykład):
