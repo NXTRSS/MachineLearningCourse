@@ -16,7 +16,7 @@ DATA_FILES = {
         "file_id": "1KE3IOH0OxPI5QTeV2WI9Oi8GIVTBC8vw",
         "filename": "catvsnotcat.pkl"
     },
-    "other_dataset": {
+    "data_houses": {
         "file_id": "1CAF1VATIvKNtQXpXo4VvVxrFi_t75Qea",
         "filename": "data_houses.csv"
     }
