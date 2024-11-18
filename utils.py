@@ -9,6 +9,7 @@ import urllib
 import os
 import matplotlib.pyplot as plt
 import io
+import subprocess
 
 DATA_FILES = {
     "catvsnotcat": {
