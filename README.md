@@ -102,28 +102,28 @@ Aby upewnić się, że środowisko Pythonowe zostało skonfigurowane poprawnie, 
    ```bash
    (ml) kamil@ubuntu:~/MachineLearningCodes/MachineLearningCourse$ python verify_env.py
 
-Checking Python version...
+   Checking Python version...
 
-Python Version: OK (Version 3.9.7)
+   Python Version: OK (Version 3.9.7)
 
-Checking installed packages...
+   Checking installed packages...
 
-Package tensorflow: OK (Version 2.15.0)
-Package pillow: OK (Version 9.4.0)
-Package pandas: OK (Version 1.4.1)
-Package scikit-learn: OK (Version 1.0.2)
-Package seaborn: OK (Version 0.11.2)
-Package plotly: OK (Version 5.1.0)
-Package pydot: OK (Version 1.4.2)
-Package jupyterlab: OK (Version 4.2.5)
-Package matplotlib: OK (Version 3.4.3)
-Package ipywidgets: OK (Version 8.1.2)
+   Package tensorflow: OK (Version 2.15.0)
+   Package pillow: OK (Version 9.4.0)
+   Package pandas: OK (Version 1.4.1)
+   Package scikit-learn: OK (Version 1.0.2)
+   Package seaborn: OK (Version 0.11.2)
+   Package plotly: OK (Version 5.1.0)
+   Package pydot: OK (Version 1.4.2)
+   Package jupyterlab: OK (Version 4.2.5)
+   Package matplotlib: OK (Version 3.4.3)
+   Package ipywidgets: OK (Version 8.1.2)
 
-Checking system-level packages...
+   Checking system-level packages...
 
-Package graphviz: OK (Installed via conda)
+   Package graphviz: OK (Installed via conda)
 
-Environment verification: OK
+   Environment verification: OK
    ```
 Jeśli pojawią się błędy lub ostrzeżenia, skrypt wskaże brakujące paczki lub niezgodności w wersjach. Proszę upewnić się, że wszystkie wymagane pakiety zostały zainstalowane zgodnie z instrukcjami.
 
