@@ -26,16 +26,25 @@ def download_file(file_id, filename):
     Funkcja do pobrania pliku, jeśli jeszcze go nie ma.
     Sprawdza, czy plik istnieje, jeśli nie, pobiera go.
     """
+    # Generowanie URL na podstawie ID pliku
     url = f"https://drive.google.com/uc?id={file_id}"
+
+    # Sprawdzenie, czy trzeba zainstalować gdown
+    try:
+        subprocess.run(["pip", "show", "gdown"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError:
+        print("Instaluję gdown...")
+        subprocess.run(["pip", "install", "gdown"], check=True)
 
     if not os.path.exists(filename):
         print(f"Plik {filename} nie istnieje, pobieram...")
         
-        # Pobranie pliku przy pomocy wget
+        # Pobranie pliku przy pomocy gdown
         try:
-            subprocess.run(["wget", url, "-O", filename], check=True)
+            import gdown
+            gdown.download(url, filename, quiet=False)
             print(f"Plik {filename} został pomyślnie pobrany!")
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             print(f"Błąd podczas pobierania pliku {filename}: {e}")
     else:
         print(f"Plik {filename} już istnieje, nie trzeba pobierać.")
