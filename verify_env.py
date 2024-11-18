@@ -1,8 +1,9 @@
 import sys
-import pkg_resources
-import tensorflow as tf
+import subprocess
+from importlib.metadata import version, PackageNotFoundError
 
-EXPECTED_PACKAGES = {
+# Define the required packages and their expected versions
+required_packages = {
     "tensorflow": "2.15.0",
     "pillow": "9.4.0",
     "pandas": "1.4.1",
@@ -10,58 +11,64 @@ EXPECTED_PACKAGES = {
     "seaborn": "0.11.2",
     "plotly": "5.1.0",
     "pydot": "1.4.2",
-    "graphviz": "2.40.1",
     "jupyterlab": "4.2.5",
     "matplotlib": "3.4.3",
     "ipywidgets": "8.1.2",
 }
 
-EXPECTED_PYTHON_VERSION = "3.9.7"
+# Check Python version
+print("Checking Python version...\n")
+python_version = sys.version_info
+expected_python_version = (3, 9, 7)
+if (python_version.major, python_version.minor, python_version.micro) == expected_python_version:
+    print(f"Python Version: OK (Version {'.'.join(map(str, python_version[:3]))})")
+else:
+    print(f"WARNING: Python Version: {'.'.join(map(str, python_version[:3]))} (Expected: {'.'.join(map(str, expected_python_version))})")
 
-def check_python_version():
-    print("\nChecking Python version...\n")
-    current_python_version = sys.version.split()[0]
-    
-    if current_python_version != EXPECTED_PYTHON_VERSION:
-        print(f"WARNING: Python Version - Expected {EXPECTED_PYTHON_VERSION}, Found {current_python_version}")
-    else:
-        print(f"Python Version: OK (Version {current_python_version})")
+# Function to check package versions using importlib.metadata
+def check_package(package_name, expected_version):
+    try:
+        installed_version = version(package_name)
+        if installed_version == expected_version:
+            print(f"Package {package_name}: OK (Version {installed_version})")
+        else:
+            print(f"WARNING: Package {package_name}: Found Version {installed_version} (Expected: {expected_version})")
+    except PackageNotFoundError:
+        print(f"ERROR: Package {package_name}: NOT INSTALLED")
 
-def check_package_versions():
-    print("\nChecking installed packages...\n")
-    all_ok = True
-    warnings = []
-    
-    for package, expected_version in EXPECTED_PACKAGES.items():
-        try:
-            installed_version = pkg_resources.get_distribution(package).version
-            if installed_version != expected_version:
-                warnings.append(
-                    f"WARNING: Package {package} - Expected {expected_version}, Found {installed_version}"
-                )
-            else:
-                print(f"Package {package}: OK (Version {installed_version})")
-        except pkg_resources.DistributionNotFound:
-            print(f"ERROR: Package {package} - NOT INSTALLED")
+# Function to check system-level packages like graphviz (installed via conda)
+def check_system_package(package_name):
+    try:
+        result = subprocess.run(["conda", "list", package_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if result.returncode == 0 and package_name in result.stdout:
+            print(f"Package {package_name}: OK (Installed via conda)")
+        else:
+            print(f"WARNING: Package {package_name}: NOT INSTALLED (System-level package missing)")
+    except FileNotFoundError:
+        print(f"ERROR: Conda not found. Could not check system-level package {package_name}.")
+
+# Check installed packages via importlib.metadata
+print("\nChecking installed packages...\n")
+for package, expected_version in required_packages.items():
+    check_package(package, expected_version)
+
+# Now check system-level packages (e.g., graphviz installed via conda)
+print("\nChecking system-level packages...\n")
+check_system_package("graphviz")
+
+# Final check
+print("\nEnvironment verification: ", end="")
+all_ok = True
+for package, expected_version in required_packages.items():
+    try:
+        installed_version = version(package)
+        if installed_version != expected_version:
             all_ok = False
-    
-    for warning in warnings:
-        print(warning)
-    
-    if all_ok and not warnings:
-        print("\nEnvironment verification: SUCCESS!")
-    elif warnings:
-        print("\nEnvironment verification: WARNINGS DETECTED. Review above messages.")
-    else:
-        print("\nEnvironment verification: FAILED. Please fix the errors above.")
+    except PackageNotFoundError:
+        all_ok = False
 
-def check_tensorflow_gpu():
-    print("\nChecking TensorFlow configuration...\n")
-    print(f"TensorFlow Version: {tf.__version__}")
-    gpu_available = len(tf.config.list_physical_devices('GPU')) > 0
-    print(f"GPU Available: {'YES' if gpu_available else 'NO'}")
+if all_ok:
+    print("OK")
+else:
+    print("FAILED. Please fix the errors above.")
 
-if __name__ == "__main__":
-    check_python_version()  # Check Python version
-    check_package_versions()  # Check package versions
-    check_tensorflow_gpu()  # Check TensorFlow configuration
