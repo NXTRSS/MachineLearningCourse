@@ -10,6 +10,53 @@ import os
 import matplotlib.pyplot as plt
 import io
 
+DATA_FILES = {
+    "catvsnotcat": {
+        "file_id": "1KE3IOH0OxPI5QTeV2WI9Oi8GIVTBC8vw",
+        "filename": "catvsnotcat.pkl"
+    },
+    "other_dataset": {
+        "file_id": "1CAF1VATIvKNtQXpXo4VvVxrFi_t75Qea",
+        "filename": "data_houses.csv"
+    }
+}
+
+def download_file(file_id, filename):
+    """
+    Funkcja do pobrania pliku, jeśli jeszcze go nie ma.
+    Sprawdza, czy plik istnieje, jeśli nie, pobiera go.
+    """
+    url = f"https://drive.google.com/uc?id={file_id}"
+
+    if not os.path.exists(filename):
+        print(f"Plik {filename} nie istnieje, pobieram...")
+        
+        # Pobranie pliku przy pomocy wget
+        try:
+            subprocess.run(["wget", url, "-O", filename], check=True)
+            print(f"Plik {filename} został pomyślnie pobrany!")
+        except subprocess.CalledProcessError as e:
+            print(f"Błąd podczas pobierania pliku {filename}: {e}")
+    else:
+        print(f"Plik {filename} już istnieje, nie trzeba pobierać.")
+
+def check_and_download_data(files_to_check=None):
+    """
+    Sprawdza, czy określone dane są dostępne i pobiera je, jeśli to konieczne.
+    
+    Parametr:
+        files_to_check (list): Lista nazw plików do sprawdzenia i pobrania. Jeśli None, sprawdzane są wszystkie pliki w DATA_FILES.
+    """
+    if files_to_check is None:
+        # Jeśli nie podano listy, sprawdzają się wszystkie pliki
+        files_to_check = DATA_FILES.keys()
+    
+    for key in files_to_check:
+        if key in DATA_FILES:
+            data = DATA_FILES[key]
+            download_file(data["file_id"], data["filename"])
+        else:
+            print(f"Błąd: {key} nie jest zdefiniowany w DATA_FILES.")
 
 class SelectFilesButton(widgets.Button):
     """A file widget that leverages tkinter.filedialog."""
