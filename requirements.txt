@@ -12,3 +12,7 @@ matplotlib==3.4.3
 ipywidgets==8.1.2
 ipykernel
 gdown
+nltk
+spacy
+gensim==4.1.2
+svgling==0.3.1
