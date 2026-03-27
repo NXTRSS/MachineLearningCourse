@@ -21,4 +21,6 @@ dependencies = [
     "spacy",
     "gensim==4.1.2",
     "svgling==0.3.1",
+    "sentence-transformers",
+    "openai",
 ]
