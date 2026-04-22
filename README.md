@@ -47,6 +47,14 @@ python verify_env.py
 Jeśli zobaczysz `Environment verification: OK` — wszystko jest gotowe!
 
 
+## Ollama (warsztaty LLM)
+
+Na zajęcia z Function Calling i RAG potrzebny jest lokalny model językowy.
+Przed tymi zajęciami proszę uruchomić notebook **`setup_ollama.ipynb`** — sprawdzi sprzęt, zainstaluje Ollama i pobierze odpowiedni model automatycznie.
+
+Jeśli instalacja nie wyjdzie, na zajęciach można skorzystać z serwera prowadzącego (adres IP zostanie podany na miejscu).
+
+
 ## Dane do zajęć
 
 Dane do zajęć zostaną pobrane automatycznie przy pierwszym uruchomieniu odpowiednich notebooków (przez skrypt `utils.py`). Jeśli automatyczne pobieranie nie zadziała, dane będą dostępne na dysku Google — link zostanie udostępniony na zajęciach.
