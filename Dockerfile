@@ -1,4 +1,4 @@
-FROM python:3.9.7-slim
+FROM python:3.9-slim
 
 # Instalacja zależności systemowych (graphviz + git)
 RUN apt-get update && \
