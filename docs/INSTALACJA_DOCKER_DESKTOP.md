@@ -41,9 +41,11 @@ https://learn.microsoft.com/pl-pl/windows/wsl/install
 ### Krok 3: Pierwsze uruchomienie
 
 1. Po restarcie komputera uruchom **Docker Desktop** (z menu Start)
-2. Zaakceptuj warunki licencji
-3. Poczekaj aż Docker się uruchomi (ikonka wieloryba w zasobniku systemowym przestanie się animować)
-4. Otwórz PowerShell i sprawdź: `docker --version`
+2. Zaakceptuj warunki licencji — kliknij **"Accept"**
+3. Pojawi się ekran logowania — **konto Docker nie jest potrzebne**. Kliknij **"Continue without signing in"** (małe szare łącze na dole ekranu)
+4. Pojawi się ekran powitalny / tutorial — możesz go zamknąć (X) lub kliknąć **"Skip"**
+5. Poczekaj aż Docker się uruchomi — ikonka wieloryba 🐳 w zasobniku systemowym (prawy dolny róg) przestanie się animować
+6. Otwórz PowerShell i sprawdź: `docker --version`
 
 ### Wizualny poradnik instalacji na Windows
 
@@ -66,13 +68,15 @@ Jeśli powyższe kroki sprawiają trudności, polecam ten poradnik wideo (po ang
 1. Wejdź na: https://www.docker.com/products/docker-desktop/
 2. Kliknij **"Download for Mac"**
    - Strona powinna automatycznie wykryć typ procesora (Intel / Apple Silicon)
-   - Jeśli nie wiesz jaki masz procesor: kliknij logo Apple →  "About This Mac" → przy "Chip" będzie albo "Apple M..." albo "Intel"
+   - Jeśli nie wiesz jaki masz procesor: kliknij logo Apple → "About This Mac" → przy "Chip" będzie albo "Apple M..." albo "Intel"
 3. Otwórz pobrany plik `.dmg`
 4. Przeciągnij ikonkę Docker do folderu **Applications**
 5. Uruchom Docker z folderu Applications
-6. Zaakceptuj warunki licencji
-7. Poczekaj aż Docker się uruchomi (ikonka wieloryba na pasku menu u góry)
-8. Otwórz Terminal i sprawdź: `docker --version`
+6. Zaakceptuj warunki licencji — kliknij **"Accept"**
+7. Pojawi się ekran logowania — **konto Docker nie jest potrzebne**. Kliknij **"Continue without signing in"** (małe szare łącze na dole ekranu)
+8. Pojawi się ekran powitalny / tutorial — możesz go zamknąć (X) lub kliknąć **"Skip"**
+9. Poczekaj aż Docker się uruchomi — ikonka wieloryba 🐳 pojawi się na pasku menu u góry ekranu
+10. Otwórz Terminal i sprawdź: `docker --version`
 
 ### Wizualny poradnik instalacji na macOS
 
