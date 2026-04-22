@@ -54,4 +54,4 @@ Dane do zajęć zostaną pobrane automatycznie przy pierwszym uruchomieniu odpow
 
 ## Problemy?
 
-Jeśli żaden plan nie działa, proszę o kontakt mailowy przed zajęciami. Na zajęciach w ostateczności skorzystamy z Google Colab (Plan C).
+Jeśli żaden plan nie działa, na zajęciach w ostateczności skorzystamy z Google Colab (Plan C).
