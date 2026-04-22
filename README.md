@@ -2,16 +2,18 @@
 
 Witam na zajęciach! Poniżej znajdują się instrukcje przygotowania środowiska do pracy.
 
-Przygotowałem **trzy opcje** — proszę zacząć od Planu A. Jeśli Plan A zadziała, nie trzeba czytać dalej.
+Przygotowałem **trzy opcje** — nie ma jednej jedynej słusznej. Proszę wybrać według opisu poniżej.
 
 
 ## Który plan wybrać?
 
 | Plan | Dla kogo? | Co trzeba zainstalować? |
 |------|-----------|------------------------|
-| **[Plan A — Docker](docs/PLAN_A_DOCKER.md)** | Dla każdego (rekomendowany) | Docker Desktop |
-| **[Plan B — uv](docs/PLAN_B_UV.md)** | Gdy Docker nie działa / nie da się zainstalować | uv (menedżer Pythona) |
+| **[Plan A — Docker](docs/PLAN_A_DOCKER.md)** | Chcę mieć działające środowisko najszybciej jak to możliwe, nie interesuje mnie jak to działa pod spodem | Docker Desktop |
+| **[Plan B — uv](docs/PLAN_B_UV.md)** | Chcę się nauczyć jak zarządzać środowiskiem Pythona lokalnie i zależy mi na szybszym codziennym uruchamianiu (bez narzutu Dockera) | uv (lekki menedżer Pythona) |
 | **[Plan C — Google Colab](docs/PLAN_C_COLAB.md)** | Ostateczność — gdy nic innego nie działa | Tylko przeglądarka |
+
+> **Wskazówka:** Plan B jest polecany osobom, które chcą poćwiczyć konfigurację środowiska Pythona — umiejętność przydatna daleko poza tymi zajęciami. Po jednorazowej konfiguracji działa szybciej i lżej niż Docker.
 
 
 ## Szybki start (Plan A)
