@@ -19,4 +19,4 @@ RUN python -m ipykernel install --user --name ml --display-name "Python (ml)"
 
 EXPOSE 8888
 
-CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", "--IdentityProvider.token=''"]
+CMD jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --IdentityProvider.token=''
