@@ -59,6 +59,7 @@ Na zajęcia z Function Calling i RAG potrzebny jest lokalny model językowy.
 Przed tymi zajęciami proszę uruchomić notebook **`setup_local_llm.ipynb`** — sprawdzi sprzęt i przeprowadzi przez instalację Ollamy lub LM Studio krok po kroku.
 
 Jeśli instalacja nie wyjdzie, na zajęciach można skorzystać z serwera prowadzącego (adres zostanie podany na miejscu).
+Instrukcja podłączenia i rozwiązywanie problemów: [docs/SERWER_PROWADZACEGO.md](docs/SERWER_PROWADZACEGO.md)
 
 
 ## Dane do zajęć
