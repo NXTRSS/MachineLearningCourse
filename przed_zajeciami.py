@@ -36,8 +36,7 @@ def wyczysc_i_przygotuj(path: Path):
                 komórki_wyczyszczone += 1
 
         # ── 2. Zwiń komórki Rozwiązanie / Podpowiedź ────────────────────────
-        # Zwijamy każdą komórkę markdown zawierającą słowo "Rozwiązanie"
-        # lub "Podpowiedź" — niezależnie od tego czy klucz już istnieje.
+        # Działa z emoji (✅ Rozwiązanie, 💡 Podpowiedź) i bez.
         if cell["cell_type"] == "markdown":
             src = "".join(cell.get("source", []))
             if "Rozwiązanie" in src or "Podpowiedź" in src:
