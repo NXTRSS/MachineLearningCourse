@@ -36,10 +36,15 @@ def wyczysc_i_przygotuj(path: Path):
                 komórki_wyczyszczone += 1
 
         # ── 2. Zwiń komórki Rozwiązanie / Podpowiedź ────────────────────────
-        # Działa z emoji (✅ Rozwiązanie, 💡 Podpowiedź) i bez.
+        # Zwijamy tylko komórki ZACZYNAJĄCE SIĘ od ###### (h6) z słowem
+        # kluczowym — nie dotykamy komórek które tylko wspominają te słowa
+        # w treści (np. opis legendy na początku notebooka).
         if cell["cell_type"] == "markdown":
             src = "".join(cell.get("source", []))
-            if "Rozwiązanie" in src or "Podpowiedź" in src:
+            first_line = src.lstrip().split("\n")[0]
+            is_h6 = first_line.startswith("######")
+            has_keyword = "Rozwiązanie" in first_line or "Podpowiedź" in first_line
+            if is_h6 and has_keyword:
                 cell.setdefault("metadata", {})["jp-MarkdownHeadingCollapsed"] = True
                 komórki_zwinięte += 1
 
