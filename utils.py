@@ -2,14 +2,19 @@ import pandas as pd
 import traitlets
 from ipywidgets import widgets
 from IPython.display import display
-from tkinter import Tk, filedialog
 import numpy as np
 from PIL import Image
 import urllib
 import os
 import matplotlib.pyplot as plt
 import io
-import subprocess
+
+# tkinter jest opcjonalny — nie działa w Dockerze (brak GUI)
+try:
+    from tkinter import Tk, filedialog
+    TKINTER_AVAILABLE = True
+except ImportError:
+    TKINTER_AVAILABLE = False
 
 DATA_FILES = {
     "catvsnotcat": {
@@ -27,24 +32,16 @@ def download_file(file_id, filename):
     Funkcja do pobrania pliku, jeśli jeszcze go nie ma.
     Sprawdza, czy plik istnieje, jeśli nie, pobiera go.
     """
-    # Generowanie URL na podstawie ID pliku
     url = f"https://drive.google.com/uc?id={file_id}"
-
-    # Sprawdzenie, czy trzeba zainstalować gdown
-    try:
-        subprocess.run(["pip", "show", "gdown"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except subprocess.CalledProcessError:
-        print("Instaluję gdown...")
-        subprocess.run(["pip", "install", "gdown"], check=True)
 
     if not os.path.exists(filename):
         print(f"Plik {filename} nie istnieje, pobieram...")
-        
-        # Pobranie pliku przy pomocy gdown
         try:
             import gdown
             gdown.download(url, filename, quiet=False)
             print(f"Plik {filename} został pomyślnie pobrany!")
+        except ImportError:
+            print(f"ERROR: Pakiet 'gdown' nie jest zainstalowany. Zainstaluj go: pip install gdown")
         except Exception as e:
             print(f"Błąd podczas pobierania pliku {filename}: {e}")
     else:
@@ -89,15 +86,20 @@ class SelectFilesButton(widgets.Button):
         Parameters
         ----------
         b : obj:
-            An instance of ipywidgets.widgets.Button 
+            An instance of ipywidgets.widgets.Button
         """
+        if not TKINTER_AVAILABLE:
+            print("UWAGA: tkinter nie jest dostępny w tym środowisku (np. Docker).")
+            print("Użyj funkcji predict_image_from_urls() lub podaj ścieżki do plików ręcznie.")
+            return
+
         # Create Tk root
         root = Tk()
         # Hide the main window
         root.withdraw()
         # Raise the root to the top of all windows.
         root.call('wm', 'attributes', '.', '-topmost', True)
-        # List of selected fileswill be set to b.value
+        # List of selected files will be set to b.value
         b.files = filedialog.askopenfilename(multiple=True)
 
         b.description = "Files Selected"

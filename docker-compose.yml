@@ -1,0 +1,16 @@
+services:
+  jupyter:
+    build: .
+    ports:
+      - "8888:8888"
+    volumes:
+      # Notebooki i pliki projektu - zmiany zapisują się na dysku hosta
+      - .:/app
+      # Cache pip - pakiety doinstalowane w notebookach (np. sentence-transformers)
+      # są pobierane tylko raz, przy kolejnych uruchomieniach instalacja trwa ~20s
+      - pip-cache:/root/.cache/pip
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+
+volumes:
+  pip-cache:

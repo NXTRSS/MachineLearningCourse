@@ -1,0 +1,44 @@
+[project]
+name = "machine-learning-course"
+version = "1.0.0"
+description = "Zajęcia z Uczenia Maszynowego - Python Podyplomowe"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    # TensorFlow — od 2.16 ma realne wheels na wszystkich platformach
+    # (2.15 miał stuby 2KB na macOS ARM64/Linux ARM64)
+    "tensorflow>=2.16",
+
+    # Podstawowe ML
+    "pillow>=9.4.0",
+    "pandas>=1.4.1",
+    "scikit-learn>=1.0.2",
+    "seaborn>=0.13.0",
+    "plotly>=5.1.0",
+    "matplotlib>=3.7.0",
+
+    # Wizualizacja grafów (sieci neuronowe)
+    # UWAGA: wymaga też systemowego graphviz binary:
+    #   macOS: brew install graphviz
+    #   Linux: apt-get install graphviz
+    #   Windows: https://graphviz.org/download/
+    "pydot>=2.0",
+    "graphviz>=0.20.3",
+
+    # Jupyter
+    "jupyterlab>=4.2.5",
+    "ipywidgets>=8.1.2",
+    "ipykernel",
+
+    # Narzędzia
+    "gdown",
+
+    # NLP
+    "nltk",
+    "spacy>=3.7",
+    "gensim>=4.3.0",
+    "svgling>=0.3.1",
+    "sentence-transformers",
+
+    # API
+    "openai",
+]
