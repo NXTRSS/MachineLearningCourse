@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Zajęcia z Uczenia Maszynowego - Python Podyplomowe"
 requires-python = "==3.9.*"
 dependencies = [
-    "tensorflow==2.15",
+    "tensorflow==2.15; sys_platform != 'win32'",
     "pillow>=9.4.0",
     "pandas>=1.4.1",
     "scikit-learn>=1.0.2",
