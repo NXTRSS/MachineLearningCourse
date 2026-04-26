@@ -35,13 +35,13 @@ def wyczysc_i_przygotuj(path: Path):
                 cell["execution_count"] = None
                 komórki_wyczyszczone += 1
 
-        # ── 2. Zwiń komórki zwijalne ─────────────────────────────────────────
-        # Tylko komórki, które już MAJĄ klucz jp-MarkdownHeadingCollapsed w
-        # metadanych — tzn. zostały celowo zaprojektowane jako zwijalne.
-        # Nie dodajemy tego klucza do nowych komórek (nie zgadujemy po treści).
-        if "jp-MarkdownHeadingCollapsed" in cell.get("metadata", {}):
-            if not cell["metadata"]["jp-MarkdownHeadingCollapsed"]:
-                cell["metadata"]["jp-MarkdownHeadingCollapsed"] = True
+        # ── 2. Zwiń komórki Rozwiązanie / Podpowiedź ────────────────────────
+        # Zwijamy każdą komórkę markdown zawierającą słowo "Rozwiązanie"
+        # lub "Podpowiedź" — niezależnie od tego czy klucz już istnieje.
+        if cell["cell_type"] == "markdown":
+            src = "".join(cell.get("source", []))
+            if "Rozwiązanie" in src or "Podpowiedź" in src:
+                cell.setdefault("metadata", {})["jp-MarkdownHeadingCollapsed"] = True
                 komórki_zwinięte += 1
 
     with open(path, "w", encoding="utf-8") as f:
