@@ -1,0 +1,23 @@
+# Dane (za duże na Git)
+*.pkl
+*.csv
+*.zip
+*.keras
+*.model
+glove.6B/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# System
+.DS_Store
+logs/
+
+# IDE
+.vscode/
+.idea/
