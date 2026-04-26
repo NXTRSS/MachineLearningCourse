@@ -1,6 +1,6 @@
-# Plan A — uv (lokalny Python bez Dockera)
+# Plan A — uv ⭐ (polecany)
 
-Jeśli Docker nie zadziałał, `uv` to szybki i prosty menedżer środowisk Pythona. Działa na Windowsie, Macu i Linuksie. Nie wymaga Condy, Anacondy, ani żadnych wirtualnych maszyn.
+`uv` to szybki i lekki menedżer środowisk Pythona. Działa na Windowsie, Macu i Linuksie. Nie wymaga Condy, Anacondy, Dockera ani żadnych wirtualnych maszyn.
 
 
 ## Krok 1: Instalacja uv
