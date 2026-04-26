@@ -9,9 +9,9 @@ Na zajęciach z Function Calling i RAG używamy modeli językowych uruchomionych
 | RAM | Co możesz uruchomić |
 |-----|---------------------|
 | < 8 GB | Za mało — skorzystaj z serwera prowadzącego na zajęciach |
-| 8 GB | Małe modele: `llama3.2:3b`, `gemma3:4b`, `phi4-mini` |
-| 16 GB | Komfortowe modele: `llama3.1:8b`, `mistral:7b`, `gemma3:12b` |
-| 32 GB+ | Duże modele: `llama3.1:70b` (skwantyzowany), `gemma3:27b` |
+| 8 GB | Małe modele: `qwen3:4b` ⭐, `gemma3:4b`, `phi4-mini` |
+| 16 GB | Komfortowe modele: `qwen3:8b` ⭐, `llama3.1:8b`, `gemma3:12b` |
+| 32 GB+ | Duże modele: `qwen3:14b`, `gemma3:27b`, `llama3.1:70b` (skwantyzowany) |
 
 > **Mac z Apple Silicon (M1/M2/M3/M4)** — GPU jest zintegrowany z CPU, więc cały RAM jest dostępny dla modelu. Laptop z 16 GB M2 pobije wiele desktopów z kartą 8 GB VRAM.
 
@@ -106,14 +106,24 @@ W LM Studio: przy wyszukiwaniu modelu wybierz zakładkę **MLX** lub filtruj po 
 
 | Model | Rozmiar | RAM | Jakość | Uwagi |
 |-------|---------|-----|--------|-------|
-| `llama3.2:3b` | ~2 GB | 8 GB | ★★★☆ | Minimum, działa wszędzie |
-| `gemma3:4b` | ~3 GB | 8 GB | ★★★★ | Dobry stosunek jakości do rozmiaru |
-| `phi4-mini` | ~2.5 GB | 8 GB | ★★★★ | Świetny mały model od Microsoft |
-| `llama3.1:8b` | ~5 GB | 16 GB | ★★★★★ | Polecany jeśli masz 16 GB RAM |
-| `mistral:7b` | ~4.5 GB | 16 GB | ★★★★☆ | Klasyk, szybki |
-| `gemma3:12b` | ~8 GB | 16 GB | ★★★★★ | Najlepszy w swojej klasie |
+| `qwen3:4b` | ~3 GB | 8 GB | ★★★★★ | ⭐ Najlepsza jakość w klasie 4B, polecany |
+| `gemma3:4b` | ~3 GB | 8 GB | ★★★★ | Dobra alternatywa dla Qwen3:4b |
+| `phi4-mini` | ~2.5 GB | 8 GB | ★★★★ | Lżejszy, szybszy, nieco słabszy |
+| `llama3.2:3b` | ~2 GB | 8 GB | ★★★☆ | Minimum, gdy brakuje miejsca |
+| `qwen3:8b` | ~5 GB | 16 GB | ★★★★★ | ⭐ Polecany dla 16 GB RAM |
+| `llama3.1:8b` | ~5 GB | 16 GB | ★★★★★ | Równie dobry, popularna alternatywa |
+| `gemma3:12b` | ~8 GB | 16 GB | ★★★★★ | Świetny jeśli masz zapas RAM |
+| `qwen3:14b` | ~9 GB | 32 GB | ★★★★★ | Bardzo mocny model dla entuzjastów |
 
-> Na zajęciach używamy głównie `llama3.1:8b` lub `gemma3:12b` — jeśli masz 16 GB RAM, pobierz jeden z nich.
+> Na zajęciach używamy głównie modeli 8B — jeśli masz 16 GB RAM, pobierz `qwen3:8b` lub `llama3.1:8b`.
+
+#### O rodzinie Qwen3
+
+Qwen3 (Alibaba, 2025) to aktualnie jedna z najsilniejszych rodzin otwartych modeli. Kilka ciekawych cech:
+- **Tryb myślenia** — model może "myśleć na głos" (jak chain-of-thought) zanim odpowie; można to wyłączyć dodając `/no_think` w prompcie, gdy zależy Ci na szybkości
+- **128K kontekst** — znacznie więcej niż starsze modele (zwykle 4–8K)
+- **119 języków** — w tym polski
+- Dostępny na Ollama (`qwen3:4b`, `qwen3:8b` itd.) i w MLX na Apple Silicon
 
 ---
 
@@ -145,7 +155,7 @@ Upewnij się że masz zainstalowane [Visual C++ Redistributable](https://aka.ms/
 - **Nie lubisz terminala** → LM Studio
 - **Mac z Apple Silicon** → LM Studio (MLX) lub Ollama
 - **Chcesz automatyzować / skryptować** → Ollama
-- **Mało RAM (8 GB)** → `gemma3:4b` lub `phi4-mini` w LM Studio
-- **Dużo RAM (16 GB+)** → `llama3.1:8b` w Ollamie lub LM Studio
+- **Mało RAM (8 GB)** → `qwen3:4b` w LM Studio lub Ollama
+- **Dużo RAM (16 GB+)** → `qwen3:8b` lub `llama3.1:8b` w Ollamie lub LM Studio
 
 Na zajęciach serwer prowadzącego jest zawsze dostępny jako backup — nie musisz mieć lokalnego modelu, żeby uczestniczyć w zajęciach.
