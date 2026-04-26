@@ -34,8 +34,7 @@ dependencies = [
 
     # NLP
     "nltk",
-    # spacy: brak wheels dla Windows (wymaga C kompilatora) — pomijamy na win32
-    "spacy>=3.7; sys_platform != 'win32'",
+    "spacy>=3.7",
     "gensim>=4.3.0",
     "svgling>=0.3.1",
     "sentence-transformers",
