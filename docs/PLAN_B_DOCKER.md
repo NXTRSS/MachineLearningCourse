@@ -1,4 +1,4 @@
-# Plan A — Docker (rekomendowany)
+# Plan B — Docker
 
 Docker pozwala na uruchomienie gotowego środowiska w jednej komendzie, niezależnie od systemu operacyjnego.
 Nie trzeba rozumieć jak Docker działa — wystarczy go zainstalować i uruchomić jedną komendę.
@@ -116,5 +116,5 @@ docker-compose up
 ### Obraz buduje się bardzo długo
 Pierwsze budowanie pobiera ~2 GB danych. Upewnij się, że masz stabilne połączenie z internetem. Przy kolejnych uruchomieniach będzie szybko.
 
-### Nie działa? Przejdź do Planu B
-**➡️ [Plan B — uv](PLAN_B_UV.md)**
+### Nie działa? Przejdź do Planu C
+**➡️ [Plan C — Google Colab](PLAN_C_COLAB.md)**
