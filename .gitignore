@@ -21,3 +21,6 @@ logs/
 # IDE
 .vscode/
 .idea/
+
+# Wewnętrzne notatki dla Claude (nie dla studentów)
+CLAUDE_NOTEBOOK_KONWENCJE.md
