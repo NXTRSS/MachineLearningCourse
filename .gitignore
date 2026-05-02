@@ -22,5 +22,18 @@ logs/
 .vscode/
 .idea/
 
-# Wewnętrzne notatki dla Claude (nie dla studentów)
+# Wewnętrzne notatki i narzędzia prowadzącego (nie dla studentów)
+CLAUDE.md
 CLAUDE_NOTEBOOK_KONWENCJE.md
+STUBY_RESETOWANIE.md
+przed_zajeciami.py
+oznacz_stub.py
+zaladuj_modele.py
+nn_hyperparams_search.py
+nn_search_results.json
+search_hyperparams.py
+search_hyperparams_cache.npz
+search_gridsearch_log.txt
+bayesian_search.py
+bayesian_results.json
+.venv_dev/
