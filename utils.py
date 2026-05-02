@@ -1,5 +1,4 @@
 import pandas as pd
-import traitlets
 from ipywidgets import widgets
 from IPython.display import display
 import numpy as np
@@ -8,13 +7,7 @@ import urllib
 import os
 import matplotlib.pyplot as plt
 import io
-
-# tkinter jest opcjonalny — nie działa w Dockerze (brak GUI)
-try:
-    from tkinter import Tk, filedialog
-    TKINTER_AVAILABLE = True
-except ImportError:
-    TKINTER_AVAILABLE = False
+import tensorflow as tf
 
 DATA_FILES = {
     "catvsnotcat": {
@@ -65,139 +58,128 @@ def check_and_download_data(files_to_check=None):
         else:
             print(f"Błąd: {key} nie jest zdefiniowany w DATA_FILES.")
 
-class SelectFilesButton(widgets.Button):
-    """A file widget that leverages tkinter.filedialog."""
+class SelectFilesButton(widgets.FileUpload):
+    """Przycisk wyboru zdjęć działający bezpośrednio w przeglądarce.
+
+    Zastępuje poprzednią implementację opartą na tkinter, która nie działała
+    w środowiskach bez GUI (Docker, JupyterHub, VS Code, itp.).
+
+    Użycie:
+        btn = SelectFilesButton()
+        display(btn)
+        # po wyborze pliku(ów):
+        for file_info in btn.value:
+            img = Image.open(io.BytesIO(file_info['content'].tobytes()))
+    """
 
     def __init__(self):
-        super(SelectFilesButton, self).__init__()
-        # Add the selected_files trait
-        self.add_traits(files=traitlets.traitlets.List())
-        # Create the button.
-        self.description = "Select Files"
-        self.icon = "square-o"
-        self.style.button_color = "orange"
-        # Set on click behavior.
-        self.on_click(self.select_files)
+        super().__init__(
+            accept='image/*',
+            multiple=True,
+            description='Wybierz zdjęcia',
+            button_style='warning',
+            layout=widgets.Layout(width='auto'),
+        )
 
-    @staticmethod
-    def select_files(b):
-        """Generate instance of tkinter.filedialog.
+def _model_input_geometry(model_inference):
+    input_shape = model_inference.input_shape
+    if len(input_shape) == 2:
+        return int(np.sqrt(input_shape[1] // 3)), True
+    if len(input_shape) == 4:
+        return input_shape[1], False
+    raise ValueError(
+        f"{bcolors.BOLD}{bcolors.FAIL}Wykryto zły kształt wejścia do modelu: "
+        f"{model_inference.input_shape}{bcolors.ENDC}"
+    )
 
-        Parameters
-        ----------
-        b : obj:
-            An instance of ipywidgets.widgets.Button
-        """
-        if not TKINTER_AVAILABLE:
-            print("UWAGA: tkinter nie jest dostępny w tym środowisku (np. Docker).")
-            print("Użyj funkcji predict_image_from_urls() lub podaj ścieżki do plików ręcznie.")
-            return
 
-        # Create Tk root
-        root = Tk()
-        # Hide the main window
-        root.withdraw()
-        # Raise the root to the top of all windows.
-        root.call('wm', 'attributes', '.', '-topmost', True)
-        # List of selected files will be set to b.value
-        b.files = filedialog.askopenfilename(multiple=True)
+def _iter_uploaded_images(my_button):
+    """Iteruje po obrazkach z FileUpload — kompatybilne z ipywidgets 7.x i 8.x."""
+    value = my_button.value
 
-        b.description = "Files Selected"
-        b.icon = "check-square-o"
-        b.style.button_color = "lightgreen"
+    # ipywidgets 8.x: tuple/list of dicts {name, type, size, content: memoryview}
+    if isinstance(value, (tuple, list)) and len(value) > 0:
+        for file_info in value:
+            content = file_info['content']
+            if hasattr(content, 'tobytes'):
+                content = content.tobytes()
+            yield file_info['name'], content
+        return
+
+    # ipywidgets 7.x: {filename: {metadata, content: bytes}}
+    if isinstance(value, dict) and len(value) > 0:
+        for fname, meta in value.items():
+            yield fname, meta['content']
+        return
+
+    # Fallback: sprawdź atrybut .data (starsze wersje ipywidgets)
+    data = getattr(my_button, 'data', None)
+    if data:
+        if isinstance(data, (list, tuple)):
+            for i, raw in enumerate(data):
+                yield f"image_{i}", raw
+        elif isinstance(data, dict):
+            for fname, raw in data.items():
+                yield fname, raw
+
+
+def _predict_one(model_inference, image, classNames, IMG_SIZE, flattening):
+    resized_down = image.resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
+    resized_down = np.array(resized_down) / 255.0
+    if flattening:
+        resized_down = resized_down.reshape(1, -1)
+    else:
+        resized_down = np.expand_dims(resized_down, axis=0)
+    predicted_classes = np.squeeze(model_inference.predict(resized_down, verbose=0))
+    return classNames[int(np.argmax(predicted_classes))], float(np.max(predicted_classes))
+
 
 def predict_image_from_files(model_inference, my_button, classNames):
-    # Get the input shape from the model
-    input_shape = model_inference.input_shape
-    
-    # Handle flattened input vs. 3D image input
-    if len(input_shape) == 2:  # Flattened input case
-        IMG_SIZE = int(np.sqrt(input_shape[1] // 3))  # Calculate IMG_SIZE from flattened size
-        flattening = True
-    elif len(input_shape) == 4:  # 3D image input case with color channels
-        IMG_SIZE = input_shape[1]
-        flattening = False
-    else:
-        raise ValueError(f"{bcolors.BOLD}{bcolors.FAIL}Wykryto zły kształt wejścia do modelu: {model_inference.input.shape}{bcolors.ENDC}")
+    IMG_SIZE, flattening = _model_input_geometry(model_inference)
+    files = list(_iter_uploaded_images(my_button))
 
-    if len(my_button.files) > 0:
-        cols = 2 if len(my_button.files) >= 2 else 1
-        rows = int(np.ceil(len(my_button.files) / 2))
-        fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(18, 12))
-        
-        if len(my_button.files) >= 2:
-            axes = axes.flatten()
-        else:
-            axes = [axes]
-        
-        for image_path, axis in zip(my_button.files, axes):
-            axis.axis('off')
-            
-            # Open image with PIL
-            image = Image.open(image_path).convert('RGB')
-            axis.imshow(image)
-            
-            # Resize the image based on model's expected input size
-            resized_down = image.resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
-            resized_down = np.array(resized_down) / 255.0
-            
-            # Flatten if the model expects flattened input
-            if flattening:
-                resized_down = resized_down.reshape(1, -1)
-            else:
-                resized_down = tf.expand_dims(resized_down, axis=0)
-            
-            predicted_classes = np.squeeze(model_inference.predict(resized_down))
-            axis.set_title(f"Prediction: {classNames[np.argmax(predicted_classes)]}")
-        
-        if len(axes) > len(my_button.files):
-            axes[-1].axis('off')
-        
-        # Show the plot with the images and predictions
-        plt.show()
+    if not files:
+        print(f"{bcolors.WARNING}Najpierw wybierz zdjęcie/zdjęcia za pomocą przycisku powyżej.{bcolors.ENDC}")
+        return
+
+    cols = 2 if len(files) >= 2 else 1
+    rows = int(np.ceil(len(files) / 2))
+    fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(18, 6 * rows))
+    axes = axes.flatten() if len(files) >= 2 else [axes]
+
+    for (fname, raw_bytes), axis in zip(files, axes):
+        image = Image.open(io.BytesIO(raw_bytes)).convert('RGB')
+        axis.imshow(image)
+        axis.axis('off')
+        label, prob = _predict_one(model_inference, image, classNames, IMG_SIZE, flattening)
+        axis.set_title(f"Prediction: {label} ({prob:.0%})")
+
+    for extra_axis in axes[len(files):]:
+        extra_axis.axis('off')
+    plt.show()
+
 
 def predict_image_from_urls(model_inference, urls, classNames):
-    # Get the input shape from the model
-    input_shape = model_inference.input_shape
-    
-    # Handle flattened input vs. 3D image input
-    if len(input_shape) == 2:  # Flattened input case
-        IMG_SIZE = int(np.sqrt(input_shape[1] // 3))  # Calculate IMG_SIZE from flattened size
-        flattening = True
-    elif len(input_shape) == 4:  # 3D image input case with color channels
-        IMG_SIZE = input_shape[1]
-        flattening = False
-    else:
-        raise ValueError(f"{bcolors.BOLD}{bcolors.FAIL}Wykryto zły kształt wejścia do modelu: {model_inference.input.shape}{bcolors.ENDC}")
-        
+    IMG_SIZE, flattening = _model_input_geometry(model_inference)
+
     cols = 2 if len(urls) >= 2 else 1
     rows = int(np.ceil(len(urls) / 2))
-    fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(18, 12))
-    
-    if len(urls) >= 2:
-        axes = axes.flatten()
-    else:
-        axes = [axes]
-    
+    fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(18, 6 * rows))
+    axes = axes.flatten() if len(urls) >= 2 else [axes]
+
     for photo_url, axis in zip(urls, axes):
-        url_response = urllib.request.urlopen(photo_url)
-        img_array = np.array(bytearray(url_response.read()), dtype=np.uint8)
-    
-        # Load image with PIL
-        image = Image.open(io.BytesIO(img_array)).convert('RGB')
+        # Wikimedia i część CDN zwracają 403 bez User-Agent
+        req = urllib.request.Request(photo_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            img_bytes = response.read()
+        image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
         axis.imshow(image)
-        
-        resized_down = image.resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
-        resized_down = np.array(resized_down) / 255.0
-        
-        if flattening:
-            resized_down = resized_down.reshape(1, -1)
-        else:
-            resized_down = tf.expand_dims(resized_down, axis=0)
-        
-        predicted_classes = np.squeeze(model_inference.predict(resized_down))
-        axis.set_title(f"Prediction: {classNames[np.argmax(predicted_classes)]}")
         axis.axis('off')
+        label, prob = _predict_one(model_inference, image, classNames, IMG_SIZE, flattening)
+        axis.set_title(f"Prediction: {label} ({prob:.0%})")
+
+    for extra_axis in axes[len(urls):]:
+        extra_axis.axis('off')
     plt.show()
 
 class bcolors:
