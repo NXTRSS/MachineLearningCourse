@@ -123,19 +123,82 @@ def _iter_uploaded_images(my_button):
                 yield fname, raw
 
 
-def _predict_one(model_inference, image, classNames, IMG_SIZE, flattening):
-    resized_down = image.resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
-    resized_down = np.array(resized_down) / 255.0
+def _is_logreg(model):
+    """Sprawdza czy model to dict regresji logistycznej (z kluczami 'w' i 'b')."""
+    return isinstance(model, dict) and "w" in model and "b" in model
+
+
+def _normalize_models(models):
+    """Zamienia input na dict {nazwa: model}.
+
+    Obsługuje:
+      - dict regresji logist. (z 'w','b') → {"Logistic Regression": dict}
+      - pojedynczy model Keras             → {model.name: model}
+      - listę/krotkę                       → {model.name: model, ...}
+      - dict {nazwa: model}                → bez zmian
+    """
+    if _is_logreg(models):
+        return {"Logistic Regression": models}
+    if isinstance(models, dict):
+        return models
+    if isinstance(models, (list, tuple)):
+        result = {}
+        for m in models:
+            name = "Logistic Regression" if _is_logreg(m) else m.name
+            result[name] = m
+        return result
+    return {models.name: models}
+
+
+def _predict_one(model, image, classNames):
+    """Predykcja jednego obrazka jednym modelem (sam wykrywa geometrię)."""
+    if _is_logreg(model):
+        # Regresja logistyczna: dict z 'w' i 'b'
+        w, b = model["w"], model["b"]
+        IMG_SIZE = int(np.sqrt(w.shape[0] // 3))
+        resized = image.resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
+        resized = np.array(resized) / 255.0
+        resized = resized.reshape(-1, 1)
+        A = 1 / (1 + np.exp(-(np.dot(w.T, resized) + b)))
+        prob = float(np.squeeze(A))
+        predicted_class = 1 if prob > 0.5 else 0
+        confidence = prob if predicted_class == 1 else 1 - prob
+        label = classNames[predicted_class] if isinstance(classNames, (list, tuple)) else classNames.get(predicted_class, str(predicted_class))
+        return label, confidence
+
+    # Model Keras
+    IMG_SIZE, flattening = _model_input_geometry(model)
+    resized = image.resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
+    resized = np.array(resized) / 255.0
     if flattening:
-        resized_down = resized_down.reshape(1, -1)
+        resized = resized.reshape(1, -1)
     else:
-        resized_down = np.expand_dims(resized_down, axis=0)
-    predicted_classes = np.squeeze(model_inference.predict(resized_down, verbose=0))
-    return classNames[int(np.argmax(predicted_classes))], float(np.max(predicted_classes))
+        resized = np.expand_dims(resized, axis=0)
+    predicted_classes = np.squeeze(model.predict(resized, verbose=0))
+    idx = int(np.argmax(predicted_classes))
+    label = classNames[idx] if isinstance(classNames, (list, tuple)) else classNames.get(idx, str(idx))
+    return label, float(np.max(predicted_classes))
 
 
-def predict_image_from_files(model_inference, my_button, classNames):
-    IMG_SIZE, flattening = _model_input_geometry(model_inference)
+def _build_title(models_dict, image, classNames):
+    """Buduje tytuł z predykcjami wszystkich modeli."""
+    if len(models_dict) == 1:
+        model = list(models_dict.values())[0]
+        label, prob = _predict_one(model, image, classNames)
+        return f"Prediction: {label} ({prob:.0%})"
+    parts = []
+    for name, model in models_dict.items():
+        label, prob = _predict_one(model, image, classNames)
+        parts.append(f"{name}: {label} ({prob:.0%})")
+    return "  |  ".join(parts)
+
+
+def predict_image_from_files(models, my_button, classNames):
+    """Predykcja z przesłanych plików.
+
+    models: pojedynczy model, lista modeli, lub dict {nazwa: model}
+    """
+    models_dict = _normalize_models(models)
     files = list(_iter_uploaded_images(my_button))
 
     if not files:
@@ -151,16 +214,19 @@ def predict_image_from_files(model_inference, my_button, classNames):
         image = Image.open(io.BytesIO(raw_bytes)).convert('RGB')
         axis.imshow(image)
         axis.axis('off')
-        label, prob = _predict_one(model_inference, image, classNames, IMG_SIZE, flattening)
-        axis.set_title(f"Prediction: {label} ({prob:.0%})")
+        axis.set_title(_build_title(models_dict, image, classNames), fontsize=12)
 
     for extra_axis in axes[len(files):]:
         extra_axis.axis('off')
     plt.show()
 
 
-def predict_image_from_urls(model_inference, urls, classNames):
-    IMG_SIZE, flattening = _model_input_geometry(model_inference)
+def predict_image_from_urls(models, urls, classNames):
+    """Predykcja z URLi.
+
+    models: pojedynczy model, lista modeli, lub dict {nazwa: model}
+    """
+    models_dict = _normalize_models(models)
 
     cols = 2 if len(urls) >= 2 else 1
     rows = int(np.ceil(len(urls) / 2))
@@ -168,15 +234,13 @@ def predict_image_from_urls(model_inference, urls, classNames):
     axes = axes.flatten() if len(urls) >= 2 else [axes]
 
     for photo_url, axis in zip(urls, axes):
-        # Wikimedia i część CDN zwracają 403 bez User-Agent
         req = urllib.request.Request(photo_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             img_bytes = response.read()
         image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
         axis.imshow(image)
         axis.axis('off')
-        label, prob = _predict_one(model_inference, image, classNames, IMG_SIZE, flattening)
-        axis.set_title(f"Prediction: {label} ({prob:.0%})")
+        axis.set_title(_build_title(models_dict, image, classNames), fontsize=12)
 
     for extra_axis in axes[len(urls):]:
         extra_axis.axis('off')
