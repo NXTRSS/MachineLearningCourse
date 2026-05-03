@@ -246,6 +246,45 @@ def predict_image_from_urls(models, urls, classNames):
         extra_axis.axis('off')
     plt.show()
 
+_TOKEN_COLORS = [
+    '#BBDEFB', '#C8E6C9', '#FFE0B2', '#F8BBD0',
+    '#D1C4E9', '#B2EBF2', '#FFF9C4', '#FFCCBC',
+    '#DCEDC8', '#F0F4C3', '#B3E5FC', '#E1BEE7',
+]
+
+def show_tokens(text, label='', model='gpt-4o'):
+    import html as _html
+    import tiktoken
+    from IPython.display import display, HTML
+
+    enc = tiktoken.encoding_for_model(model)
+    tokens = enc.encode(text)
+    decoded = [enc.decode([t]) for t in tokens]
+
+    spans = []
+    for i, tok in enumerate(decoded):
+        color = _TOKEN_COLORS[i % len(_TOKEN_COLORS)]
+        visible = tok.replace(' ', '␣').replace('\n', '↵')
+        visible = _html.escape(visible)
+        spans.append(
+            f'<span style="background:{color}; padding:2px 4px; '
+            f'border-radius:3px; margin:1px; display:inline-block; '
+            f'font-family:monospace; font-size:14px; '
+            f'border:1px solid rgba(0,0,0,0.1);">{visible}</span>'
+        )
+
+    header = f'<b style="font-size:13px; color:#555;">{label}</b><br>' if label else ''
+    html = (
+        f'<div style="margin:6px 0;">'
+        f'{header}'
+        f'<code style="font-size:13px;">{_html.escape(text)}</code><br>'
+        f'<span style="font-size:12px; color:#888;">{len(tokens)} tokenów:</span> '
+        f'{" ".join(spans)}'
+        f'</div>'
+    )
+    display(HTML(html))
+
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
