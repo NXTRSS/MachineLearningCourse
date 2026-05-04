@@ -372,3 +372,12 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+
+def display_generated_city(prompt):
+    """Wyświetla wygenerowaną nazwę miasta z Modelu Języka, ładnie sformatowaną z emoji 🏘️.
+
+    Argument `prompt` to pełny ciąg z tokenami specjalnymi % i ! — np. '%Babciowice!'.
+    """
+    from IPython.display import display, Markdown
+    display(Markdown(f"## 🏘️ **Wygenerowana nazwa miasta:** `{prompt[1:-1].title()}`"))
