@@ -235,8 +235,16 @@ def predict_image_from_urls(models, urls, classNames):
 
     for photo_url, axis in zip(urls, axes):
         req = urllib.request.Request(photo_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            img_bytes = response.read()
+        for _attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    img_bytes = response.read()
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 429 and _attempt < 2:
+                    import time; time.sleep(2 * (_attempt + 1))
+                else:
+                    raise
         image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
         axis.imshow(image)
         axis.axis('off')
