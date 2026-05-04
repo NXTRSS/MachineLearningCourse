@@ -246,6 +246,83 @@ def predict_image_from_urls(models, urls, classNames):
         extra_axis.axis('off')
     plt.show()
 
+from sklearn.decomposition import PCA
+from collections import namedtuple
+import matplotlib.lines as mlines
+from matplotlib import cm
+
+
+def to_2d(embeddings, pca_model=None):
+    if pca_model is None:
+        pca_model = PCA(n_components=2, whiten=True)
+        pca_model.fit(embeddings)
+    return pca_model.transform(embeddings)
+
+
+def annotated_scatter(points, names, color='blue'):
+    x_coords = points[:, 0]
+    y_coords = points[:, 1]
+    plt.scatter(x_coords, y_coords, c=color)
+    for label, x, y in zip(names, x_coords, y_coords):
+        plt.annotate(label, xy=(x, y), xytext=(0, 0), textcoords='offset points')
+    plt.xlim(x_coords.min() - .5, x_coords.max() + .5)
+    plt.ylim(y_coords.min() - .5, y_coords.max() + .5)
+
+
+def plot_embeddings(embeddings, names, color='blue', show=True, pca_model=None):
+    X_train = np.array([embeddings[k] for k in names])
+    embeddings_2d = to_2d(X_train, pca_model=pca_model)
+
+    annotated_scatter(embeddings_2d, names, color)
+    plt.grid()
+
+    if show:
+        plt.show()
+
+
+LinearSubs = namedtuple('LinearSubs', ('word_pair', 'name'))
+
+
+def plot_linear_substructures(linear_subs, embeddings, pca_model=None):
+    embeddings_matrix = [embeddings[p] for ls in linear_subs for p in ls.word_pair]
+    embeddings_matrix = np.array(embeddings_matrix)
+    pair_names = [p for ls in linear_subs for p in ls.word_pair]
+    ls_names = [ls.name for ls in linear_subs]
+    embeddings_2d = to_2d(embeddings_matrix, pca_model=pca_model)
+    annotated_scatter(embeddings_2d,
+                      pair_names,
+                      cm.Set1.colors[:len(embeddings_2d)])
+
+    for i in range(0, len(embeddings_2d), 2):
+        p1 = embeddings_2d[i]
+        p2 = embeddings_2d[i + 1]
+        center = [(p1[j] + p2[j]) / 2 + .04 for j in range(2)]
+
+        plt.plot(*zip(p1, p2), '--')
+        plt.annotate(ls_names[i // 2],
+                     xy=center,
+                     xytext=(0, 0), textcoords='offset points')
+
+
+def glove_most_similar(embeddings, positive=None, negative=None, topn=10):
+    vec = np.zeros_like(list(embeddings.values())[0])
+    query_words = set()
+    for w in (positive or []):
+        vec = vec + embeddings[w]
+        query_words.add(w)
+    for w in (negative or []):
+        vec = vec - embeddings[w]
+        query_words.add(w)
+
+    norms = np.array([np.linalg.norm(v) for v in embeddings.values()])
+    dots = np.array([np.dot(vec, v) for v in embeddings.values()])
+    sims = dots / (norms * np.linalg.norm(vec) + 1e-10)
+
+    words = list(embeddings.keys())
+    ranked = sorted(zip(words, sims), key=lambda x: -x[1])
+    return [(w, float(s)) for w, s in ranked if w not in query_words][:topn]
+
+
 _TOKEN_COLORS = [
     '#BBDEFB', '#C8E6C9', '#FFE0B2', '#F8BBD0',
     '#D1C4E9', '#B2EBF2', '#FFF9C4', '#FFCCBC',
