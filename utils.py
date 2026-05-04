@@ -241,7 +241,7 @@ def predict_image_from_urls(models, urls, classNames):
                     img_bytes = response.read()
                 break
             except urllib.error.HTTPError as e:
-                if e.code == 429 and _attempt < 2:
+                if e.code in (429, 502, 503, 504) and _attempt < 2:
                     import time; time.sleep(2 * (_attempt + 1))
                 else:
                     raise
