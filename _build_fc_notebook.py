@@ -123,7 +123,10 @@ Szczegóły instalacji: patrz `setup_local_llm.ipynb` lub `docs/LOKALNE_LLM.md`
 cells.append(code("""\
 from utils import connect_llm
 
-client, MODEL_NAME, OLLAMA_URL = connect_llm()
+# Jeśli nie masz lokalnego LLM-a, wpisz adres serwera prowadzącego (podany na zajęciach):
+INSTRUCTOR_SERVER = "http://192.168.1.100:11434"
+
+client, MODEL_NAME, OLLAMA_URL = connect_llm(instructor_server=INSTRUCTOR_SERVER)
 
 if client:
     print(f"\\nKlient LLM gotowy!\\nModel: {MODEL_NAME}")\
