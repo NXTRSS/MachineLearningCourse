@@ -1,75 +1,169 @@
 # Zajęcia z Uczenia Maszynowego
 
-Witam na zajęciach! Poniżej znajdują się instrukcje przygotowania środowiska do pracy.
-
-Przygotowałem **trzy opcje** — zaczynam od rekomendowanej, ale każda działa.
-
-
 ## Który plan wybrać?
 
-| Plan | Dla kogo? | Co trzeba zainstalować? |
-|------|-----------|------------------------|
-| **[Plan A — uv](docs/PLAN_A_UV.md)** ⭐ *polecany* | Dla wszystkich — lekkie, szybkie, uczy zarządzania środowiskiem Pythona | uv (lekki menedżer Pythona) |
-| **[Plan B — Docker](docs/PLAN_B_DOCKER.md)** | Nie chcę konfigurować Pythona lokalnie — wolę jedno kliknięcie | Docker Desktop |
-| **[Plan C — Google Colab](docs/PLAN_C_COLAB.md)** | Ostateczność — gdy nic innego nie działa | Tylko przeglądarka |
+| Plan | Dla kogo? | Wymaga |
+|------|-----------|--------|
+| **[Plan A — uv](docs/PLAN_A_UV.md)** ⭐ *polecany* | Dla wszystkich | uv (~50 MB) |
+| **[Plan B — Docker](docs/PLAN_B_DOCKER.md)** | Nie chcę konfigurować Pythona | Docker Desktop |
+| **[Plan C — Google Colab](docs/PLAN_C_COLAB.md)** | Ostateczność — nic innego nie działa | Tylko przeglądarka |
 
-> **Dlaczego uv?** Po jednorazowej konfiguracji (ok. 5 minut) środowisko startuje natychmiast, nie zużywa zbędnych zasobów i uczy umiejętności przydatnej daleko poza tymi zajęciami. Jeśli jednak konfigurowanie Pythona lokalnie brzmi zniechęcająco — Plan B z Dockerem też jest OK, zrobi wszystko za Ciebie.
+> **Dlaczego uv?** Jednorazowa konfiguracja (~5 min), startuje natychmiast, działa natywnie na Windows / Mac / Linux bez VM. Uczy też umiejętności przydatnej poza zajęciami.
 
+---
 
-## Szybki start (Plan A — uv)
+## 🔧 Pierwsze uruchomienie (robimy raz)
+
+### Plan A — uv
 
 ```bash
 # 1. Zainstaluj uv (jednorazowo)
-curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS / Linux
-# Windows: winget install astral-sh.uv
+curl -LsSf https://astral.sh/uv/install.sh | sh    # macOS / Linux
+winget install astral-sh.uv                         # Windows (PowerShell)
 
-# 2. Sklonuj repo i uruchom
+# 2. Sklonuj repo
 git clone https://github.com/NXTRSS/MachineLearningCourse
 cd MachineLearningCourse
+
+# 3. Zainstaluj środowisko i kernel
 uv sync
+uv run python -m ipykernel install --user --name ml --display-name "Python (ml)"
+
+# 4. Uruchom JupyterLab
 uv run jupyter lab
 ```
 
-Otwórz przeglądarkę: **http://localhost:8888** — gotowe!
+Pełna instrukcja + rozwiązywanie problemów: [docs/PLAN_A_UV.md](docs/PLAN_A_UV.md)
 
-Pełna instrukcja: [docs/PLAN_A_UV.md](docs/PLAN_A_UV.md)
+---
 
+### Plan B — Docker
 
-## Wymagania sprzętowe
+```bash
+# 1. Zainstaluj Docker Desktop → https://docs.docker.com/desktop/
+#    Uruchom go i poczekaj aż ikona przestanie się kręcić
 
-- **RAM**: minimum 6 GB (zalecane 8 GB)
-- **Dysk**: ~3 GB wolnego miejsca
-- **System**: Windows 10/11, macOS 12+, lub Linux (Ubuntu 20.04+)
+# 2. Sklonuj repo
+git clone https://github.com/NXTRSS/MachineLearningCourse
+cd MachineLearningCourse
 
+# 3. Uruchom (pierwsze pobranie obrazu: 5–15 min)
+docker compose up
+```
 
-## Weryfikacja środowiska
+Pełna instrukcja + rozwiązywanie problemów: [docs/PLAN_B_DOCKER.md](docs/PLAN_B_DOCKER.md)
 
-Po uruchomieniu środowiska (dowolnym planem) otwórz terminal w JupyterLab i uruchom:
+---
 
+### Plan C — Google Colab
+
+Wejdź na [colab.research.google.com](https://colab.research.google.com) → **File → Open notebook → GitHub** → wklej:
+```
+https://github.com/NXTRSS/MachineLearningCourse
+```
+
+Pełna instrukcja: [docs/PLAN_C_COLAB.md](docs/PLAN_C_COLAB.md)
+
+---
+
+## ▶️ Każde kolejne zajęcia (codzienny start)
+
+### Plan A — uv
+
+```bash
+cd MachineLearningCourse
+uv run jupyter lab
+```
+
+Otwórz przeglądarkę: **http://localhost:8888**
+
+W JupyterLab wybierz kernel **Python (ml)** — nie domyślny Python 3.
+
+---
+
+### Plan B — Docker
+
+1. Upewnij się, że **Docker Desktop jest uruchomiony** (ikona w zasobniku systemowym)
+2. W terminalu:
+```bash
+cd MachineLearningCourse
+docker compose up
+```
+3. Otwórz przeglądarkę: **http://localhost:8888**
+
+Aby zatrzymać: `Ctrl+C` w terminalu lub `docker compose down`.
+
+---
+
+### Plan C — Google Colab
+
+Wejdź na [colab.research.google.com](https://colab.research.google.com) i otwórz notebook z historii lub ponownie z GitHub.
+
+⚠️ Colab nie zachowuje zainstalowanych paczek między sesjami — pierwsza komórka każdego notebooka instaluje je automatycznie.
+
+---
+
+## 🔄 Po aktualizacji materiałów
+
+Przed zajęciami prowadzący może aktualizować notebooki. Żeby mieć najnowszą wersję:
+
+**Plan A i B:**
+```bash
+cd MachineLearningCourse
+git pull
+uv sync          # tylko Plan A — jeśli zmieniły się zależności
+```
+
+**Plan C:** pobierz notebook ponownie z GitHub (File → Open notebook → GitHub).
+
+---
+
+## ✅ Weryfikacja środowiska
+
+Po pierwszej konfiguracji sprawdź czy wszystko działa:
+
+**Plan A:**
+```bash
+uv run python verify_env.py
+```
+
+**Plan B** — w terminalu JupyterLab (File → New → Terminal):
 ```bash
 python verify_env.py
 ```
 
-Jeśli zobaczysz `Environment verification: OK` — wszystko jest gotowe!
+Jeśli zobaczysz `Environment verification: OK` — gotowe!
 
+---
+
+## Wymagania sprzętowe
+
+- **RAM**: minimum 6 GB (zalecane 8 GB)
+- **Dysk**: ~3 GB (Plan A/B) lub brak (Plan C)
+- **System**: Windows 10/11, macOS 12+, Linux (Ubuntu 20.04+)
+
+---
 
 ## Ollama / LM Studio (warsztaty LLM)
 
 Na zajęcia z Function Calling i RAG potrzebny jest lokalny model językowy.
-Przed tymi zajęciami proszę uruchomić notebook **`setup_local_llm.ipynb`** — sprawdzi sprzęt i przeprowadzi przez instalację Ollamy lub LM Studio krok po kroku.
+Uruchom notebook **`setup_local_llm.ipynb`** — sprawdzi sprzęt i przeprowadzi przez instalację.
 
-Chcesz przygotować się wcześniej w domu? Pełny przewodnik — porównanie platform, jakie modele pobrać, MLX na Apple Silicon, rozwiązywanie problemów:
-**[docs/LOKALNE_LLM.md](docs/LOKALNE_LLM.md)**
+Chcesz przygotować się wcześniej? → **[docs/LOKALNE_LLM.md](docs/LOKALNE_LLM.md)**
 
-Jeśli instalacja nie wyjdzie, na zajęciach można skorzystać z serwera prowadzącego (adres zostanie podany na miejscu).
-Instrukcja podłączenia i rozwiązywanie problemów: [docs/SERWER_PROWADZACEGO.md](docs/SERWER_PROWADZACEGO.md)
+Na zajęciach dostępny jest też serwer prowadzącego (adres podany na miejscu) → [docs/SERWER_PROWADZACEGO.md](docs/SERWER_PROWADZACEGO.md)
 
+---
 
 ## Dane do zajęć
 
-Dane zostaną pobrane automatycznie przy pierwszym uruchomieniu odpowiednich notebooków (przez skrypt `utils.py`). Jeśli automatyczne pobieranie nie zadziała, dane będą dostępne na dysku Google — link zostanie udostępniony na zajęciach.
+Pobierane automatycznie przy pierwszym uruchomieniu notebooka (przez `utils.py`).
+Jeśli nie zadziała — link do Google Drive zostanie podany na zajęciach.
 
+---
 
 ## Problemy?
 
-Jeśli żaden plan nie działa, na zajęciach w ostateczności skorzystamy z Google Colab (Plan C).
+- Przeczytaj komunikat błędu w terminalu i wklej go do ChatGPT / Claude / Gemini — to działa.
+- Sprawdź szczegółowe instrukcje dla swojego planu w folderze [`docs/`](docs/).
+- Na zajęciach zawsze można skorzystać z Google Colab jako backup.
