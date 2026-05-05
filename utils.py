@@ -450,3 +450,47 @@ def visualize_probabilities(probabilities, step, tokenizer, prompt, chosen_idx, 
     plt.tight_layout()
     if show:
         plt.show()
+
+
+# ─────────────────────────── ensure_package ───────────────────────────
+
+def ensure_package(pip_name, import_name=None):
+    """Sprawdź czy pakiet jest dostępny; jeśli nie — zainstaluj.
+
+    Działa z uv (Plan A), Docker/pip (Plan B) i Google Colab (Plan C).
+    """
+    import subprocess, sys, shutil
+    import_name = import_name or pip_name
+    try:
+        __import__(import_name)
+        return
+    except ImportError:
+        pass
+
+    print(f"Instaluję {pip_name}...")
+
+    # 1) uv pip install — środowisko uv (Plan A)
+    if shutil.which("uv"):
+        try:
+            subprocess.check_call(
+                ["uv", "pip", "install", "--quiet", pip_name],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            return
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+    # 2) python -m pip — Docker, Colab, zwykły venv
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "-q", pip_name],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    raise RuntimeError(
+        f"Nie udało się zainstalować {pip_name}. "
+        f"Spróbuj ręcznie: uv pip install {pip_name}  lub  pip install {pip_name}"
+    )
