@@ -121,81 +121,12 @@ Szczegóły instalacji: patrz `setup_local_llm.ipynb` lub `docs/LOKALNE_LLM.md`
 **Function calling działa najlepiej z modelami:** `qwen3.5:4b+`, `gemma4:4b+`, `qwen3:8b+`"""))
 
 cells.append(code("""\
-PREFERRED_MODELS = [
-    "qwen3.5:27b", "qwen3.5:9b", "qwen3.5:4b",
-    "qwen3:14b", "qwen3:8b",
-    "gemma4:12b", "gemma4:4b",
-    "gemma3:27b", "gemma3:12b", "gemma3:8b",
-    "qwen2.5:14b", "qwen2.5:7b",
-    "gemma2:9b", "mistral:7b", "llama3.1:8b",
-    "qwen3.5:2b", "qwen3.5:0.8b",
-    "qwen3:4b", "qwen3:1.7b", "qwen3:0.6b",
-    "gemma4:e4b", "gemma4:e2b",
-    "gemma3:4b", "gemma3:1b", "qwen2.5:3b",
-]
+from utils import connect_llm
 
-INSTRUCTOR_SERVER = "http://192.168.1.100:11434"
+client, MODEL_NAME, OLLAMA_URL = connect_llm()
 
-def detect_ollama(base_url="http://localhost:11434"):
-    headers = {"ngrok-skip-browser-warning": "true"} if "ngrok" in base_url else {}
-    try:
-        r = requests.get(f"{base_url}/api/tags", timeout=3, headers=headers)
-        if r.status_code == 200:
-            return [m["name"] for m in r.json().get("models", [])]
-    except Exception:
-        pass
-    return []
-
-def detect_lmstudio(base_url="http://localhost:1234"):
-    try:
-        r = requests.get(f"{base_url}/api/v1/models", timeout=3)
-        if r.status_code == 200:
-            models = r.json().get("models", [])
-            return [m["key"] for m in models if m.get("type") == "llm"]
-    except Exception:
-        pass
-    return []
-
-def pick_best_model(available_models):
-    for preferred in PREFERRED_MODELS:
-        pname = preferred.split(":")[0]
-        for available in available_models:
-            if pname in available:
-                return available
-    return available_models[0] if available_models else None
-
-OLLAMA_URL = None
-MODEL_NAME = None
-
-print("Szukam LM Studio (port 1234)...")
-lms_models = detect_lmstudio("http://localhost:1234")
-if lms_models:
-    OLLAMA_URL = "http://localhost:1234"
-    MODEL_NAME = pick_best_model(lms_models) or lms_models[0]
-    print(f"\\u2713 LM Studio znalezione! Wybrany model: {MODEL_NAME}")
-else:
-    print("  LM Studio niedostępne.")
-    print("Szukam lokalnej Ollamy (port 11434)...")
-    local_models = detect_ollama("http://localhost:11434")
-    if local_models:
-        OLLAMA_URL = "http://localhost:11434"
-        MODEL_NAME = pick_best_model(local_models)
-        print(f"\\u2713 Lokalna Ollama znaleziona! Wybrany model: {MODEL_NAME}")
-    else:
-        print("  Ollama niedostępna.")
-        print("Próbuję serwer prowadzącego...")
-        instructor_models = detect_ollama(INSTRUCTOR_SERVER)
-        if instructor_models:
-            OLLAMA_URL = INSTRUCTOR_SERVER
-            MODEL_NAME = pick_best_model(instructor_models)
-            print(f"\\u2713 Serwer prowadzącego dostępny! Wybrany model: {MODEL_NAME}")
-        else:
-            print("\\u2717 Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
-
-if OLLAMA_URL:
-    is_lmstudio = "1234" in OLLAMA_URL
-    client = OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="lm-studio" if is_lmstudio else "ollama")
-    print(f"\\nKlient LLM gotowy! ({'LM Studio' if is_lmstudio else 'Ollama'})\\nModel: {MODEL_NAME}")\
+if client:
+    print(f"\\nKlient LLM gotowy!\\nModel: {MODEL_NAME}")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
