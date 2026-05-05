@@ -1,16 +1,16 @@
-name: Check commit author
+name: CI
 
 on: [push, pull_request]
 
 jobs:
-  check-author:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Reject unwanted authors/committers
+      - name: Validate commit metadata
         run: |
           BLOCKED_EMAILS="kamil.jedryczek@airslate.com"
           BLOCKED_NAMES="claude"
@@ -25,7 +25,7 @@ jobs:
 
             for EMAIL in $BLOCKED_EMAILS; do
               if [ "$AUTHOR_EMAIL" = "$EMAIL" ] || [ "$COMMITTER_EMAIL" = "$EMAIL" ]; then
-                echo "::error::Commit $COMMIT has blocked email: $EMAIL"
+                echo "::error::Commit $COMMIT — unexpected email"
                 FAILED=1
               fi
             done
@@ -34,17 +34,12 @@ jobs:
               AUTHOR_LOWER=$(echo "$AUTHOR_NAME" | tr '[:upper:]' '[:lower:]')
               COMMITTER_LOWER=$(echo "$COMMITTER_NAME" | tr '[:upper:]' '[:lower:]')
               if [ "$AUTHOR_LOWER" = "$NAME" ] || [ "$COMMITTER_LOWER" = "$NAME" ]; then
-                echo "::error::Commit $COMMIT has blocked author/committer name: $NAME"
+                echo "::error::Commit $COMMIT — unexpected author"
                 FAILED=1
               fi
             done
           done
 
           if [ "$FAILED" = "1" ]; then
-            echo ""
-            echo "Użyj: git commit --author='NXTRSS <kamillo_j@yahoo.com>'"
-            echo "Lub popraw historię: git filter-branch / git rebase --exec"
             exit 1
           fi
-
-          echo "All commits OK — author/committer check passed."
