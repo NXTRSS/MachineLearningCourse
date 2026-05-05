@@ -47,10 +47,10 @@ cells.append(md("""\
 
 ### Plan warsztatu
 
-1. **Idea**: LLM nie tylko generuje tekst — może *decydować* które funkcje wywołać
-2. **Definiowanie narzędzi**: Opiszemy funkcje Pythona w formacie zrozumiałym dla LLM-a
+1. **Pydantic**: Nauczymy się definiować **strukturalne dane** — klucz do komunikacji z LLM-em
+2. **Narzędzia**: Zdefiniujemy funkcje Pythona, które LLM będzie mógł wywoływać (pogoda, kalkulator, baza prezydentów)
 3. **Pod maską**: Zobaczymy *dokładnie* co LLM widzi, jak wybiera funkcję, i co dostaje z powrotem
-4. **Pydantic**: Nauczymy narzędzia zwracać *ustrukturyzowane* dane — i zobaczymy jak Pydantic automatycznie generuje opisy narzędzi
+4. **Wikipedia i web search**: Podłączymy prawdziwe źródła wiedzy
 5. **Structured Output**: Zmusimy LLM-a do odpowiadania w *ścisłym formacie* — z uzasadnieniem i źródłami
 6. **Pętla agentowa**: Zbudujemy mini-agenta który sam decyduje jakie narzędzia użyć
 
@@ -89,14 +89,15 @@ ensure_package("openai")
 ensure_package("pydantic")
 ensure_package("instructor")
 ensure_package("wikipedia")
-ensure_package("ddgs")
+ensure_package("duckduckgo-search", "duckduckgo_search")
 
 from openai import OpenAI
+from pydantic import BaseModel, Field
+from typing import List, Optional, Literal
 import requests
 import json
 import math
-import random
-import textwrap
+import urllib.parse
 from pathlib import Path
 
 print("Pakiety załadowane!")\
@@ -133,37 +134,144 @@ if client:
 """))
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 3: NARZĘDZIA
+# SEKCJA 3: PYDANTIC 101
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 3. Definiujemy nasze "narzędzia" (funkcje Pythona)
+## 3. Pydantic — ustrukturyzowane dane
 
-Zaczniemy od prostych funkcji, które LLM będzie mógł wywoływać.
-Każda funkcja ma **docstring** — opis co robi. To jest kluczowe!
-LLM czyta ten opis żeby zdecydować *kiedy* i *jak* użyć danej funkcji.
+Zanim zaczniemy definiować narzędzia, poznajmy **Pydantic** — bibliotekę do definiowania
+schematów danych w Pythonie. Dlaczego?
 
-Zobaczmy co się stanie **pod maską**."""))
+1. Nasze narzędzia będą zwracać **ustrukturyzowane dane** (nie surowe stringi)
+2. Pydantic automatycznie **generuje JSON Schema** — format którego LLM-y używają do opisu narzędzi
+3. Dane są **walidowane** — jeśli coś jest nie tak, dostaniemy błąd od razu
+
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
+<b>Pydantic w jednym zdaniu:</b> Definiujesz klasę z polami i typami → Python automatycznie
+waliduje dane i generuje schemat JSON — ten sam format którego używają OpenAI, Anthropic, Ollama.
+</div>"""))
 
 cells.append(code("""\
+# Definiujemy "formularz" danych — model Pydantic:
+
+class WeatherReport(BaseModel):
+    city: str = Field(..., description="Nazwa miasta")
+    temperature_celsius: float = Field(..., description="Temperatura w stopniach Celsjusza")
+    conditions: str = Field(..., description="Opis pogody, np. 'słonecznie', 'deszcz'")
+    humidity_percent: int = Field(..., ge=0, le=100, description="Wilgotność w procentach")
+
+# Tworzymy instancję:
+report = WeatherReport(
+    city="Kraków",
+    temperature_celsius=18.5,
+    conditions="słonecznie",
+    humidity_percent=45
+)
+
+print("Obiekt Pydantic:")
+print(report)
+print(f"\\nDostęp do pól: {report.city}, {report.temperature_celsius}°C")
+
+# Serializacja do JSON:
+print(f"\\nJSON:\\n{report.model_dump_json(indent=2)}")
+
+# Walidacja — co się stanie z wilgotnością 150%?
+print("\\nWalidacja — wilgotność 150%:")
+try:
+    WeatherReport(city="X", temperature_celsius=0, conditions="x", humidity_percent=150)
+except Exception as e:
+    print(f"  Błąd! {e}")\
+"""))
+
+cells.append(code("""\
+# Kluczowa supermoc: Pydantic generuje JSON Schema automatycznie!
+# To jest DOKŁADNIE ten format, którego LLM-y używają do opisu narzędzi.
+
+schema = WeatherReport.model_json_schema()
+print("=== JSON Schema wygenerowany przez Pydantic ===")
+print(json.dumps(schema, indent=2, ensure_ascii=False))
+
+print("\\n→ Za chwilę zobaczymy jak to wygląda w praktyce z LLM-em.")\
+"""))
+
+# ══════════════════════════════════════════════════════════════════════
+# SEKCJA 4: NARZĘDZIA Z PYDANTIC
+# ══════════════════════════════════════════════════════════════════════
+
+cells.append(md("""\
+## 4. Definiujemy narzędzia (z Pydantic!)
+
+Teraz zdefiniujemy funkcje Pythona, które LLM będzie mógł wywoływać.
+Każde narzędzie zwraca dane w formacie JSON — dzięki Pydantic!
+
+### 4a. Pogoda (prawdziwe dane z wttr.in)
+
+Narzędzie próbuje pobrać **prawdziwą pogodę** z darmowego API [wttr.in](https://wttr.in).
+Jeśli API jest niedostępne (brak internetu, timeout) — automatycznie przełącza się
+na **dane zastępcze** (mock) z odpowiednim komunikatem."""))
+
+cells.append(code("""\
+MOCK_WEATHER = {
+    "Kraków":   {"temp": 18, "opis": "słonecznie",              "wilgotność": 45},
+    "Warszawa": {"temp": 15, "opis": "pochmurno",               "wilgotność": 70},
+    "Gdańsk":   {"temp": 12, "opis": "deszcz",                  "wilgotność": 85},
+    "Wrocław":  {"temp": 20, "opis": "słonecznie",              "wilgotność": 40},
+    "Poznań":   {"temp": 16, "opis": "częściowe zachmurzenie",  "wilgotność": 55},
+}
+
+
 def get_weather(city: str) -> str:
     \"\"\"
     Sprawdza aktualną pogodę w podanym mieście.
+    Pobiera dane z wttr.in; jeśli API niedostępne — używa danych zastępczych.
 
     Args:
         city: Nazwa miasta, np. 'Kraków', 'Warszawa', 'Gdańsk'
     \"\"\"
-    pogoda = {
-        "Kraków": {"temp": 18, "opis": "słonecznie", "wilgotność": 45},
-        "Warszawa": {"temp": 15, "opis": "pochmurno", "wilgotność": 70},
-        "Gdańsk": {"temp": 12, "opis": "deszcz", "wilgotność": 85},
-        "Wrocław": {"temp": 20, "opis": "słonecznie", "wilgotność": 40},
-        "Poznań": {"temp": 16, "opis": "częściowe zachmurzenie", "wilgotność": 55},
-    }
-    if city in pogoda:
-        p = pogoda[city]
-        return f"Pogoda w {city}: {p['temp']}°C, {p['opis']}, wilgotność {p['wilgotność']}%"
-    return f"Nie mam danych pogodowych dla miasta: {city}"
+    # Próba pobrania prawdziwych danych
+    try:
+        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
+        r = requests.get(url, timeout=5, headers={"Accept-Language": "pl"})
+        r.raise_for_status()
+        data = r.json()
+        current = data["current_condition"][0]
+        desc_list = current.get("lang_pl", current.get("weatherDesc", [{"value": "brak danych"}]))
+        report = WeatherReport(
+            city=city,
+            temperature_celsius=float(current["temp_C"]),
+            conditions=desc_list[0]["value"],
+            humidity_percent=int(current["humidity"]),
+        )
+        return report.model_dump_json(indent=2)
+    except Exception:
+        pass
+
+    # Fallback — dane mockowane
+    if city in MOCK_WEATHER:
+        m = MOCK_WEATHER[city]
+        report = WeatherReport(
+            city=city,
+            temperature_celsius=float(m["temp"]),
+            conditions=m["opis"],
+            humidity_percent=m["wilgotność"],
+        )
+        return "(uwaga: dane zastępcze — brak połączenia z wttr.in)\\n" + report.model_dump_json(indent=2)
+
+    return json.dumps({"error": f"Brak danych pogodowych dla: {city}"}, ensure_ascii=False)
+
+
+# Szybki test:
+print("Test pogody:")
+print(get_weather("Kraków"))\
+"""))
+
+cells.append(md("### 4b. Kalkulator"))
+
+cells.append(code("""\
+class MathResult(BaseModel):
+    expression: str = Field(..., description="Wyrażenie matematyczne wejściowe")
+    result: float = Field(..., description="Wynik obliczenia")
 
 
 def calculate(expression: str) -> str:
@@ -177,11 +285,18 @@ def calculate(expression: str) -> str:
         allowed = {"sqrt": math.sqrt, "sin": math.sin, "cos": math.cos,
                    "pi": math.pi, "abs": abs, "round": round, "pow": pow}
         result = eval(expression, {"__builtins__": {}}, allowed)
-        return f"Wynik: {expression} = {result}"
+        return MathResult(expression=expression, result=float(result)).model_dump_json(indent=2)
     except Exception as e:
-        return f"Błąd w obliczeniu '{expression}': {e}"
+        return json.dumps({"error": f"Błąd w obliczeniu '{expression}': {e}"}, ensure_ascii=False)
 
 
+print("Test kalkulatora:")
+print(calculate("sqrt(144) + 7 * 3"))\
+"""))
+
+cells.append(md("### 4c. Baza prezydentów Polski"))
+
+cells.append(code("""\
 def load_presidents():
     \"\"\"Ładuje dane o prezydentach z pliku prezydenci_polski.md\"\"\"
     md_path = Path("prezydenci_polski.md")
@@ -213,10 +328,11 @@ PREZYDENCI = load_presidents()
 def search_presidents(query: str) -> str:
     \"\"\"
     Przeszukuje bazę danych o prezydentach Polski (III RP).
-    Znajduje informacje pasujące do zapytania.
+    Zawiera informacje o kadencjach, partiach, wykształceniu,
+    kluczowych wydarzeniach i mało znanych faktach.
 
     Args:
-        query: Zapytanie, np. 'najmłodszy prezydent', 'katastrofa', 'Kwaśniewski'
+        query: Zapytanie, np. 'najmłodszy prezydent', 'Kwaśniewski', 'mało znany fakt'
     \"\"\"
     if not PREZYDENCI:
         return "Brak danych — nie znaleziono pliku prezydenci_polski.md"
@@ -226,13 +342,14 @@ def search_presidents(query: str) -> str:
     for p in PREZYDENCI:
         all_text = " ".join(str(v) for v in p.values()).lower()
         if query_lower in all_text:
-            info = f"{p.get('imię', '?')} ({p.get('kadencja', '?')})"
-            if 'kluczowe wydarzenia' in p:
-                info += f": {p['kluczowe wydarzenia']}"
-            wyniki.append(info)
+            lines = [f"### {p.get('imię', '?')}"]
+            for key, val in p.items():
+                if key != 'imię':
+                    lines.append(f"  - {key}: {val}")
+            wyniki.append("\\n".join(lines))
 
     if wyniki:
-        return "\\n".join(f"• {w}" for w in wyniki)
+        return "\\n\\n".join(wyniki)
     return f"Nie znaleziono wyników dla zapytania: {query}"
 
 
@@ -249,19 +366,17 @@ for name, func in AVAILABLE_TOOLS.items():
 """))
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 4: JSON SCHEMA
+# SEKCJA 5: JSON SCHEMA — CO WIDZI LLM
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 4. Opisanie narzędzi dla LLM-a (schemat JSON)
+## 5. JSON Schema — co widzi LLM
 
-LLM nie widzi naszego kodu Pythona bezpośrednio. Musimy mu **opisać**
-każde narzędzie w formacie JSON Schema — standardzie którego używają:
-- OpenAI (ChatGPT)
-- Anthropic (Claude)
-- Ollama / LM Studio (lokalne modele)
+LLM nie widzi naszego kodu Pythona. Musimy mu **opisać** każde narzędzie
+w formacie JSON Schema — standardzie którego używają OpenAI, Anthropic, Ollama.
 
-Zobaczmy jak wygląda taki opis — to jest **dokładnie** to co LLM dostaje:"""))
+Na razie napiszemy te opisy **ręcznie** — za chwilę zobaczymy jak Pydantic
+robi to **automatycznie**."""))
 
 cells.append(code("""\
 tools_definition = [
@@ -303,13 +418,13 @@ tools_definition = [
         "type": "function",
         "function": {
             "name": "search_presidents",
-            "description": "Przeszukuje bazę danych o prezydentach Polski. Użyj gdy pytanie dotyczy prezydentów RP.",
+            "description": "Przeszukuje bazę danych o prezydentach Polski (III RP). Zawiera kadencje, partie, wykształcenie, kluczowe wydarzenia i mało znane fakty. Użyj gdy pytanie dotyczy prezydentów RP.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Zapytanie do bazy, np. 'Kwaśniewski', 'katastrofa'"
+                        "description": "Zapytanie do bazy, np. 'Kwaśniewski', 'katastrofa', 'najmłodszy'"
                     }
                 },
                 "required": ["query"]
@@ -319,15 +434,40 @@ tools_definition = [
 ]
 
 print("=== TO WIDZI LLM (definicje narzędzi) ===")
-print(json.dumps(tools_definition, indent=2, ensure_ascii=False))\
+print(json.dumps(tools_definition[0], indent=2, ensure_ascii=False))
+print("\\n... i jeszcze 2 kolejne narzędzia.")\
+"""))
+
+cells.append(md("""\
+### Pydantic generuje to samo — automatycznie!
+
+Pamiętasz `WeatherReport.model_json_schema()`? Porównajmy z tym co napisaliśmy ręcznie.
+W przyszłości — zamiast pisać JSON Schema ręcznie — użyjemy Pydantic."""))
+
+cells.append(code("""\
+# Pydantic model dla PARAMETRÓW narzędzia (input):
+class WeatherInput(BaseModel):
+    city: str = Field(..., description="Nazwa miasta, np. 'Kraków', 'Warszawa'")
+
+auto_schema = WeatherInput.model_json_schema()
+
+# Porównanie: ręczny vs. automatyczny
+print("=== RĘCZNY (pisany przez nas) ===")
+print(json.dumps(tools_definition[0]["function"]["parameters"], indent=2, ensure_ascii=False))
+print()
+print("=== AUTOMATYCZNY (Pydantic) ===")
+print(json.dumps(auto_schema, indent=2, ensure_ascii=False))
+print()
+print("→ Pydantic dodaje 'title' — LLM-y to ignorują.")
+print("  Ale 'properties' i 'required' są IDENTYCZNE!")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 5: PIERWSZY FC
+# SEKCJA 6: PIERWSZY FC — POD MASKĄ
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 5. Pierwszy function call — krok po kroku, pod maską!
+## 6. Pierwszy function call — krok po kroku, pod maską!
 
 Teraz wyślemy pytanie do LLM-a razem z opisem narzędzi.
 LLM **sam zdecyduje** czy potrzebuje narzędzia i którego.
@@ -372,7 +512,7 @@ if OLLAMA_URL:
         print(f"\\n╔" + "═"*68 + "╗")
         print("║  KROK 3: Wywołujemy funkcję i odsyłamy wynik do LLM-a         ║")
         print("╚" + "═"*68 + "╝")
-        print(f"  Wynik funkcji: {result}")
+        print(f"  Wynik funkcji: {result[:200]}")
 
         messages.append(msg)
         messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
@@ -390,11 +530,11 @@ else:
 """))
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 6: LLM SAM WYBIERA
+# SEKCJA 7: LLM SAM WYBIERA
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 6. LLM sam wybiera narzędzie!
+## 7. LLM sam wybiera narzędzie!
 
 Zobaczmy jak LLM reaguje na **różne** pytania —
 automatycznie wybiera odpowiednie narzędzie (lub żadne!)."""))
@@ -422,19 +562,18 @@ def ask_with_tools(question, verbose=True):
             print(f"  Odpowiedź: {assistant_msg.content[:200]}")
         return assistant_msg.content
 
-    tool_call = assistant_msg.tool_calls[0]
-    func_name = tool_call.function.name
-    func_args = json.loads(tool_call.function.arguments)
-
-    if verbose:
-        print(f"  Narzędzie: {func_name}({func_args})")
-
-    result = AVAILABLE_TOOLS[func_name](**func_args)
-    if verbose:
-        print(f"  Wynik:     {result[:150]}")
-
     messages.append(assistant_msg)
-    messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
+    for tool_call in assistant_msg.tool_calls:
+        func_name = tool_call.function.name
+        func_args = json.loads(tool_call.function.arguments)
+
+        if verbose:
+            print(f"  Narzędzie: {func_name}({func_args})")
+
+        result = AVAILABLE_TOOLS.get(func_name, lambda **kw: "Nieznane narzędzie")(**func_args)
+        if verbose:
+            print(f"  Wynik:     {result[:150]}")
+        messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
 
     final = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.1)
     final_answer = final.choices[0].message.content
@@ -508,13 +647,13 @@ print(f"\\nPrzywrócono oryginał: '{original_desc}'")\
 """))
 
 cells.append(h6_collapsed(
-    '###### <span style="color: #c17f24;">💡 Podpowiedź</span> '
+    '###### <span style="color: #c17f24;">Podpowiedź</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
 Spróbuj np. `"Wykonuje obliczenia matematyczne"` — LLM powinien wybrać `calculate` zamiast `get_weather` gdy zapytasz o pogodę. Albo `"Szuka informacji o prezydentach"` — wtedy LLM wywoła `search_presidents`."""))
 cells.append(h6_collapsed(
-    '###### <span style="color: #5a8a6a;">✅ Rozwiązanie</span> '
+    '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
@@ -528,41 +667,38 @@ LLM dostanie pytanie *"Jaka jest pogoda w Krakowie?"* ale widzi, że `get_weathe
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 7: DODAJ NARZĘDZIE
-# ══════════════════════════════════════════════════════════════════════
-
-cells.append(md("""\
-## 7. Dodaj własne narzędzie
-
-Wiesz już jak LLM wybiera narzędzia na podstawie opisu.
-Pora dodać **własne** narzędzie do zestawu!"""))
-
-# ══════════════════════════════════════════════════════════════════════
 # ĆWICZENIE 2
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-### Ćwiczenie 2: Dodaj własne narzędzie
+### Ćwiczenie 2: Dodaj własne narzędzie (z Pydantic!)
 
 Stwórz nową funkcję i dodaj jej opis do `tools_definition`.
+Tym razem użyj **Pydantic** do zdefiniowania modelu odpowiedzi!
 
 **Zadanie:** Napisz narzędzie `get_population(city)` które zwraca przybliżoną liczbę
-mieszkańców polskiego miasta. Potem przetestuj je pytaniem."""))
+mieszkańców polskiego miasta. Użyj modelu Pydantic dla wyniku."""))
 
 cells.append(code("""\
-# Ćwiczenie 2: Dodaj narzędzie get_population
+# Ćwiczenie 2: Dodaj narzędzie get_population z modelem Pydantic
 
-# Krok 1: Zdefiniuj funkcję
+# Krok 1: Zdefiniuj model Pydantic dla wyniku
+
+class PopulationInfo(BaseModel):
+
+    pass  # Tutaj wpisz swój kod — pola: city (str), population (int), rank_in_poland (int, opcjonalne)
+
+# Krok 2: Zdefiniuj funkcję
 
 def get_population(city: str) -> str:
 
     pass  # Tutaj wpisz swój kod
 
-# Krok 2: Dodaj do AVAILABLE_TOOLS
+# Krok 3: Dodaj do AVAILABLE_TOOLS
 
 ...  # Tutaj wpisz swój kod
 
-# Krok 3: Dodaj definicję JSON Schema do tools_definition
+# Krok 4: Dodaj definicję JSON Schema do tools_definition
 
 ...  # Tutaj wpisz swój kod
 
@@ -578,25 +714,31 @@ except (TypeError, NameError):
 """))
 
 cells.append(h6_collapsed(
-    '###### <span style="color: #c17f24;">💡 Podpowiedź</span> '
+    '###### <span style="color: #c17f24;">Podpowiedź</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
-Wzoruj się na `get_weather` — słownik z danymi, sprawdzenie czy klucz istnieje, zwrócenie sformatowanego stringa. Do `tools_definition` dodaj element `.append({...})` z kluczami `type`, `function` (zawierającym `name`, `description`, `parameters`)."""))
+Wzoruj się na `get_weather` — słownik z danymi, Pydantic model z `Field(...)`, zwrócenie `.model_dump_json()`. Do `tools_definition` dodaj element `.append({...})` z kluczami `type`, `function` (zawierającym `name`, `description`, `parameters`)."""))
 cells.append(h6_collapsed(
-    '###### <span style="color: #5a8a6a;">✅ Rozwiązanie</span> '
+    '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
 ```python
+class PopulationInfo(BaseModel):
+    city: str = Field(..., description="Nazwa miasta")
+    population: int = Field(..., description="Przybliżona liczba mieszkańców")
+    rank_in_poland: Optional[int] = Field(None, description="Miejsce w rankingu miast Polski")
+
 def get_population(city: str) -> str:
-    populacja = {
-        "Warszawa": 1_860_000, "Kraków": 800_000, "Wrocław": 670_000,
-        "Gdańsk": 470_000, "Poznań": 535_000, "Łódź": 660_000,
+    dane = {
+        "Warszawa": (1_860_000, 1), "Kraków": (800_000, 2), "Wrocław": (670_000, 4),
+        "Gdańsk": (470_000, 6), "Poznań": (535_000, 5), "Łódź": (660_000, 3),
     }
-    if city in populacja:
-        return f"{city} ma około {populacja[city]:,} mieszkańców."
-    return f"Nie mam danych o populacji dla: {city}"
+    if city in dane:
+        pop, rank = dane[city]
+        return PopulationInfo(city=city, population=pop, rank_in_poland=rank).model_dump_json(indent=2)
+    return json.dumps({"error": f"Brak danych o populacji dla: {city}"}, ensure_ascii=False)
 
 AVAILABLE_TOOLS["get_population"] = get_population
 
@@ -618,99 +760,26 @@ tools_definition.append({
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 8: PYDANTIC
+# SEKCJA 8: WIKIPEDIA
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 8. Pydantic — ustrukturyzowane odpowiedzi narzędzi
+## 8. Wikipedia jako narzędzie
 
-Do tej pory nasze narzędzia zwracały **zwykłe stringi**: `"Pogoda w Krakowie: 18°C, słonecznie"`.
-To działa, ale ma problem: LLM musi **parsować tekst** żeby wyciągnąć z niego dane.
-
-Co gdyby narzędzia zwracały **ustrukturyzowane obiekty** z jasno nazwanymi polami?
-Tu wchodzi **Pydantic** — biblioteka do definiowania schematów danych w Pythonie.
-
-<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
-<b>Pydantic w jednym zdaniu:</b> Definiujesz klasę z polami i typami → Pydantic waliduje dane automatycznie.
-To samo co JSON Schema, ale w Pythonie — i generuje JSON Schema za darmo!
-</div>"""))
-
-cells.append(code("""\
-from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
-
-# Zamiast zwracać string "Pogoda w Krakowie: 18°C, słonecznie, wilgotność 45%"
-# definiujemy MODEL danych:
-
-class WeatherReport(BaseModel):
-    city: str = Field(..., description="Nazwa miasta")
-    temperature_celsius: float = Field(..., description="Temperatura w stopniach Celsjusza")
-    conditions: str = Field(..., description="Opis pogody, np. 'słonecznie', 'deszcz'")
-    humidity_percent: int = Field(..., ge=0, le=100, description="Wilgotność w procentach")
-
-class MathResult(BaseModel):
-    expression: str = Field(..., description="Wyrażenie matematyczne wejściowe")
-    result: float = Field(..., description="Wynik obliczenia")
-
-# Zobaczmy jak wygląda instancja:
-report = WeatherReport(city="Kraków", temperature_celsius=18.0, conditions="słonecznie", humidity_percent=45)
-print(report)
-print()
-print("Dostęp do pól:")
-print(f"  Miasto: {report.city}")
-print(f"  Temperatura: {report.temperature_celsius}°C")
-print(f"  Walidacja — wilgotność 150%?")
-try:
-    WeatherReport(city="X", temperature_celsius=0, conditions="x", humidity_percent=150)
-except Exception as e:
-    print(f"  Błąd! {e}")\
-"""))
-
-# ══════════════════════════════════════════════════════════════════════
-# SEKCJA 9: AUTO JSON SCHEMA
-# ══════════════════════════════════════════════════════════════════════
-
-cells.append(md("""\
-## 9. Automatyczne generowanie JSON Schema z Pydantic
-
-Pisaliśmy JSON Schema ręcznie w sekcji 4. Było to żmudne.
-Pydantic potrafi **wygenerować ten schemat automatycznie** z definicji klasy!
-
-To jest potężne — zamiast pisać opisy narzędzi ręcznie, **definiujesz model Pydantic
-i schemat generuje się sam**."""))
-
-cells.append(code("""\
-# Pydantic automatycznie generuje JSON Schema:
-schema = WeatherReport.model_json_schema()
-
-print("=== JSON Schema wygenerowany przez Pydantic ===")
-print(json.dumps(schema, indent=2, ensure_ascii=False))
-
-print("\\n\\n=== Porównaj z tym co pisaliśmy ręcznie (sekcja 4) ===")
-print(json.dumps(tools_definition[0]["function"]["parameters"], indent=2, ensure_ascii=False))\
-"""))
-
-cells.append(md("""\
-Widzisz? Pydantic wygenerował **dokładnie taki sam format** jak pisaliśmy ręcznie — z typami,
-opisami pól, walidacją. A do tego dostajemy **walidację za darmo** (np. wilgotność 0-100).
-
-Teraz użyjemy tego do zbudowania narzędzia Wikipedia — zdefiniujemy model Pydantic,
-a JSON Schema wygeneruje się automatycznie."""))
+Pora na **prawdziwe** narzędzie sięgające do internetu!
+Biblioteka `wikipedia` pozwala przeszukiwać Wikipedię programatycznie."""))
 
 # ══════════════════════════════════════════════════════════════════════
 # ĆWICZENIE 3: WIKIPEDIA
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-### Ćwiczenie 3: Wikipedia jako narzędzie (z modelem Pydantic)
-
-Pora na **prawdziwe** narzędzie sięgające do internetu!
-Biblioteka `wikipedia` pozwala przeszukiwać Wikipedię programatycznie.
+### Ćwiczenie 3: Zbuduj narzędzie Wikipedia (z modelem Pydantic)
 
 **Zadanie:**
 1. Zdefiniuj model `WikiArticle` (Pydantic) z polami: `title`, `summary`, `url`
 2. Napisz funkcję `search_wikipedia(query)` która zwraca dane w formacie JSON (z modelu Pydantic)
-3. Dodaj definicję narzędzia do `tools_definition` (użyj `WikiArticle.model_json_schema()`)
+3. Dodaj definicję narzędzia do `tools_definition` + do `AVAILABLE_TOOLS`
 4. Przetestuj pytaniem do LLM-a"""))
 
 cells.append(code("""\
@@ -721,7 +790,7 @@ wikipedia.set_lang("pl")
 
 class WikiArticle(BaseModel):
 
-    ...  # Tutaj wpisz swój kod — pola: title (str), summary (str, max 3 zdania), url (str)
+    ...  # Tutaj wpisz swój kod — pola: title (str), summary (str), url (str)
 
 # Krok 2: Napisz funkcję
 
@@ -746,13 +815,13 @@ except (TypeError, NameError):
 """))
 
 cells.append(h6_collapsed(
-    '###### <span style="color: #c17f24;">💡 Podpowiedź</span> '
+    '###### <span style="color: #c17f24;">Podpowiedź</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
 Model Pydantic: 3 pola z `Field(...)`. Funkcja: `wikipedia.search()` zwraca listę tytułów, `wikipedia.page()` zwraca stronę z polami `.title`, `.url`, `.summary`. Uważaj na `DisambiguationError` — złap go w `try/except`. Narzędzie zwraca `WikiArticle(...).model_dump_json()` — JSON z Pydantic modelu."""))
 cells.append(h6_collapsed(
-    '###### <span style="color: #5a8a6a;">✅ Rozwiązanie</span> '
+    '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
@@ -786,7 +855,6 @@ def search_wikipedia(query: str) -> str:
 
 AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
 
-wiki_schema = WikiArticle.model_json_schema()
 tools_definition.append({
     "type": "function",
     "function": {
@@ -805,23 +873,24 @@ tools_definition.append({
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 10: WEB SEARCH
+# SEKCJA 9: WEB SEARCH — DUCKDUCKGO
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 10. Web search — DuckDuckGo
+## 9. Web search — DuckDuckGo
 
 Wikipedia jest świetna dla encyklopedycznej wiedzy. Ale co z **aktualnymi wydarzeniami**?
 
-Biblioteka `ddgs` pozwala przeszukiwać internet przez DuckDuckGo — bez klucza API!
+Biblioteka `duckduckgo-search` pozwala przeszukiwać internet przez DuckDuckGo — **bez klucza API**!
 
-<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:12px; border-radius:4px;">
-<b>Uwaga:</b> DuckDuckGo może czasem zwrócić błąd przy wielu zapytaniach (rate limiting).
-Dlatego owijamy to w <code>try/except</code> — defensive coding w praktyce!
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
+<b>Dlaczego DuckDuckGo a nie Google?</b> Google wymaga klucza API i ma płatne limity.
+DuckDuckGo pozwala na darmowe wyszukiwanie programatyczne — idealne do prototypowania.
+Uwaga: przy wielu zapytaniach może pojawić się rate limiting (tymczasowa blokada).
 </div>"""))
 
 cells.append(code("""\
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 
 class SearchResult(BaseModel):
     title: str = Field(..., description="Tytuł wyniku wyszukiwania")
@@ -830,7 +899,7 @@ class SearchResult(BaseModel):
 
 class WebSearchResponse(BaseModel):
     query: str = Field(..., description="Wyszukiwane zapytanie")
-    results: List[SearchResult] = Field(..., description="Lista znalezionych wyników")
+    results: List[SearchResult] = Field(..., description="Lista wyników")
 
 
 def search_web(query: str) -> str:
@@ -857,7 +926,7 @@ tools_definition.append({
     "type": "function",
     "function": {
         "name": "search_web",
-        "description": "Przeszukuje internet przez DuckDuckGo. Użyj TYLKO gdy potrzebujesz aktualnych informacji, których nie ma na Wikipedii.",
+        "description": "Przeszukuje internet przez DuckDuckGo. Użyj TYLKO gdy potrzebujesz aktualnych informacji, których nie ma na Wikipedii ani w bazie prezydentów.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -873,15 +942,15 @@ print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
 
 print("\\nTest:")
 result = search_web("Python programming language")
-print(result[:300] + "...")\
+print(result[:300] + "..." if len(result) > 300 else result)\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 11: INSTRUCTOR
+# SEKCJA 10: INSTRUCTOR — STRUCTURED OUTPUT
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 11. Structured Output — LLM odpowiada strukturalnie
+## 10. Structured Output — LLM odpowiada strukturalnie
 
 Do tej pory LLM zwracał **zwykły tekst** jako odpowiedź. Ale w produkcyjnych systemach
 potrzebujemy **ustrukturyzowanej odpowiedzi** — z polami, źródłami, pewnością.
@@ -891,7 +960,7 @@ Zamiast tekstu dostajemy **obiekt Pythona** z walidowanymi polami.
 
 To jest ta sama technika, którą używają profesjonalne systemy AI:
 - Zamiast *"Kraków ma 800 tysięcy mieszkańców"*
-- Dostajemy `PopulationInfo(city="Kraków", population=800000, source="wikipedia")`"""))
+- Dostajemy `PopulationInfo(city="Kraków", population=800000, rank_in_poland=2)`"""))
 
 cells.append(code("""\
 import instructor
@@ -904,7 +973,7 @@ instructor_client = instructor.from_openai(
 class ToolReasoning(BaseModel):
     thinking: str = Field(..., description="Krótkie uzasadnienie — dlaczego wybrałeś to narzędzie (1-2 zdania)")
     needs_tool: bool = Field(..., description="Czy pytanie wymaga użycia narzędzia?")
-    tool_name: Optional[str] = Field(None, description="Nazwa narzędzia do użycia (lub None jeśli nie potrzeba)")
+    tool_name: Optional[str] = Field(None, description="Nazwa narzędzia do użycia (lub None)")
     confidence: float = Field(..., ge=0, le=1, description="Pewność wyboru w skali 0-1")
 
 if instructor_client:
@@ -962,7 +1031,7 @@ Połączmy function calling ze Structured Output!
 
 **Zadanie:** Zdefiniuj model `FactCheck` i napisz funkcję, która:
 1. Dostaje twierdzenie do sprawdzenia (np. *"Lech Wałęsa dostał Nagrodę Nobla w 1990"*)
-2. Szuka dowodów na Wikipedii (narzędzie `search_wikipedia`)
+2. Szuka dowodów — w bazie prezydentów lub na Wikipedii
 3. Używa `instructor` żeby LLM zwrócił **ustrukturyzowany werdykt**: prawda / fałsz / nie da się zweryfikować
 
 **Model FactCheck powinien mieć pola:**
@@ -1006,13 +1075,13 @@ except (TypeError, NameError, AttributeError):
 """))
 
 cells.append(h6_collapsed(
-    '###### <span style="color: #c17f24;">💡 Podpowiedź</span> '
+    '###### <span style="color: #c17f24;">Podpowiedź</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
-Krok 1: Użyj `Literal["prawda", "fałsz", "nie da się zweryfikować"]` dla verdict, `Field(..., ge=0, le=1)` dla confidence. Krok 2: Najpierw wyszukaj na Wikipedii (`search_wikipedia(claim)`), potem podaj wynik jako kontekst do `instructor_client.chat.completions.create(response_model=FactCheck, ...)`."""))
+Krok 1: Użyj `Literal["prawda", "fałsz", "nie da się zweryfikować"]` dla verdict, `Field(..., ge=0, le=1)` dla confidence. Krok 2: Najpierw wyszukaj dowody — spróbuj `search_presidents(claim)`, a jeśli nie znajdziesz, to `search_wikipedia(claim)`. Potem podaj wynik jako kontekst do `instructor_client.chat.completions.create(response_model=FactCheck, ...)`."""))
 cells.append(h6_collapsed(
-    '###### <span style="color: #5a8a6a;">✅ Rozwiązanie</span> '
+    '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
@@ -1024,38 +1093,43 @@ class FactCheck(BaseModel):
         ..., description="Werdykt na podstawie dowodów"
     )
     confidence: float = Field(..., ge=0, le=1, description="Pewność werdyktu (0=zgaduję, 1=pewny)")
-    source: str = Field(..., description="Skąd pochodzą dowody, np. URL Wikipedii")
+    source: str = Field(..., description="Skąd pochodzą dowody, np. 'baza prezydentów', 'Wikipedia'")
 
 def verify_claim(claim: str) -> FactCheck:
-    wiki_data = search_wikipedia(claim)
+    # Szukaj dowodów — najpierw prezydenci, potem Wikipedia
+    evidence = search_presidents(claim)
+    source = "baza prezydentów"
+    if "Nie znaleziono" in evidence:
+        evidence = search_wikipedia(claim)
+        source = "Wikipedia"
 
     return instructor_client.chat.completions.create(
         model=MODEL_NAME,
         response_model=FactCheck,
         messages=[
             {"role": "system", "content":
-             "Jesteś weryfikatorem faktów. Na podstawie DOWODÓW z Wikipedii oceń twierdzenie. "
+             "Jesteś weryfikatorem faktów. Na podstawie DOWODÓW oceń twierdzenie. "
              "Jeśli dowody nie wystarczają, powiedz 'nie da się zweryfikować'. Bądź uczciwy."},
             {"role": "user", "content":
-             f"Twierdzenie: {claim}\\n\\nDowody z Wikipedii:\\n{wiki_data}"}
+             f"Twierdzenie: {claim}\\n\\nDowody ({source}):\\n{evidence}"}
         ],
     )
 ```"""))
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 12: PĘTLA AGENTOWA
+# SEKCJA 11: PĘTLA AGENTOWA
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 12. Pętla agentowa — LLM który myśli i działa
+## 11. Pętla agentowa — LLM który myśli i działa
 
 Do tej pory obsługiwaliśmy **jedno** wywołanie narzędzia.
 Ale co jeśli LLM potrzebuje **kilku** narzędzi po kolei?
 
-Np. pytanie: *"Sprawdź na Wikipedii ile lat miał Kwaśniewski gdy został prezydentem i oblicz ile to dni"*
+Np. pytanie: *"Sprawdź w bazie prezydentów ile lat miał Kwaśniewski gdy został prezydentem i oblicz ile to dni"*
 wymaga:
-1. Wyszukania na Wikipedii (albo w bazie prezydentów)
+1. Wyszukania w bazie prezydentów
 2. Obliczenia matematycznego
 
 To jest **pętla agentowa** — LLM wielokrotnie wywołuje narzędzia aż znajdzie odpowiedź.
@@ -1070,7 +1144,7 @@ while LLM chce wywołać narzędzie:
 ```"""))
 
 cells.append(code("""\
-def agent(question, max_steps=5):
+def agent(question, max_steps=6):
     if not OLLAMA_URL:
         print("LLM niedostępny.")
         return
@@ -1079,7 +1153,8 @@ def agent(question, max_steps=5):
         {"role": "system", "content":
          "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
          "Używaj narzędzi aby znaleźć potrzebne informacje. "
-         "Możesz wywołać wiele narzędzi po kolei."},
+         "Możesz wywołać wiele narzędzi po kolei. "
+         "Jeśli pytanie dotyczy prezydentów Polski — ZAWSZE sprawdź narzędzie search_presidents."},
         {"role": "user", "content": question}
     ]
 
@@ -1099,19 +1174,24 @@ def agent(question, max_steps=5):
             print(f"  {msg.content}")
             return msg.content
 
+        messages.append(msg)
         for tool_call in msg.tool_calls:
             func_name = tool_call.function.name
             func_args = json.loads(tool_call.function.arguments)
 
             print(f"\\n  Krok {step+1}: LLM wywołuje → {func_name}({func_args})")
 
-            if func_name in AVAILABLE_TOOLS:
-                result = AVAILABLE_TOOLS[func_name](**func_args)
-            else:
-                result = f"Nieznane narzędzie: {func_name}"
-            print(f"           Wynik ← \\"{result[:120]}...\\"" if len(result) > 120 else f"           Wynik ← \\"{result}\\"")
+            try:
+                if func_name in AVAILABLE_TOOLS:
+                    result = AVAILABLE_TOOLS[func_name](**func_args)
+                else:
+                    result = f"Nieznane narzędzie: {func_name}"
+            except Exception as e:
+                result = f"Błąd wywołania {func_name}: {e}"
 
-            messages.append(msg)
+            display_result = result[:120] + "..." if len(result) > 120 else result
+            print(f"           Wynik ← \\"{display_result}\\"")
+
             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
 
     print(f"\\n  (Osiągnięto limit {max_steps} kroków)")
@@ -1121,14 +1201,52 @@ print("Agent gotowy! Użyj: agent('twoje pytanie')")\
 
 cells.append(code("""\
 if OLLAMA_URL:
-    print("Test 1: Pytanie o prezydentów + obliczenie")
+    print("Test 1: Prezydenci + obliczenie")
     print("═"*60)
-    agent("Ile lat miał Aleksander Kwaśniewski gdy skończył kadencję? Oblicz ile to dni.")
+    agent("Ile lat miał Aleksander Kwaśniewski gdy skończył kadencję? Oblicz ile to w przybliżeniu dni.")
 
     print("\\n\\nTest 2: Wikipedia + pogoda")
     print("═"*60)
     agent("Co to jest fotosynteza i jaka jest pogoda w Krakowie?")\
 """))
+
+# ══════════════════════════════════════════════════════════════════════
+# TAJEMNICA PREZYDENCKA — DEMO
+# ══════════════════════════════════════════════════════════════════════
+
+cells.append(md("""\
+### Tajemnica prezydencka — skąd LLM to wie?
+
+Sprawdźmy jak agent radzi sobie z pytaniami o **mało znane fakty** z naszej bazy.
+Czy LLM użyje naszego lokalnego narzędzia, czy spróbuje szukać na Wikipedii?"""))
+
+cells.append(code("""\
+if OLLAMA_URL:
+    print("Test: Mało znane fakty o prezydentach")
+    print("═"*60)
+    agent("Jakie mało znane fakty kryją polscy prezydenci? Sprawdź w bazie prezydentów, szukaj 'mało znany fakt'.")
+
+    print("\\n\\nTest: Tajemnica gabinetu Kwaśniewskiego")
+    print("═"*60)
+    agent("Co ciekawego trzymał Aleksander Kwaśniewski w swoim gabinecie prezydenckim? Sprawdź w bazie prezydentów.")\
+"""))
+
+cells.append(md("""\
+<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:16px; border-radius:4px; margin:12px 0;">
+
+**Uwaga dla studentów:** Fakty o "popiersiu Kleopatry" (Kwaśniewski) i "monetach Cezara" (Duda) są
+**całkowicie fikcyjne** — dodaliśmy je do pliku `prezydenci_polski.md` specjalnie na potrzeby tego ćwiczenia.
+
+Ten eksperyment pokazuje coś ważnego:
+- LLM odpowiedział na pytanie o "tajemnicę" bo **nasze narzędzie** mu ją podało
+- Tych informacji **nie ma** na Wikipedii ani w internecie — i nie da się ich zweryfikować
+- LLM nie "wie" — on korzysta z **narzędzi** które mu dajemy
+
+**To jest klucz do zrozumienia agentów AI: agent jest tak dobry (lub tak zły) jak jego narzędzia.**
+
+Gdybyśmy podali LLM-owi fałszywe dane — odpowiedziałby fałszywie, z pełną pewnością.
+Dlatego **jakość danych** i **wybór narzędzi** to najważniejsze decyzje przy budowaniu agentów.
+</div>"""))
 
 # ══════════════════════════════════════════════════════════════════════
 # ĆWICZENIE 5
@@ -1155,14 +1273,15 @@ except (TypeError, NameError):
 """))
 
 cells.append(h6_collapsed(
-    '###### <span style="color: #c17f24;">💡 Podpowiedź</span> '
+    '###### <span style="color: #c17f24;">Podpowiedź</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
 Przykłady pytań łączących narzędzia:
 - *"Sprawdź na Wikipedii kto wynalazł telefon i oblicz ile lat temu to było"*
-- *"Kto zginął w katastrofie smoleńskiej i jaka jest pogoda w Krakowie?"*
-- *"Znajdź na Wikipedii wysokość Mont Blanc i przelicz ją na stopy (1 stopa = 0.3048 m)"*"""))
+- *"Jaka jest pogoda w Krakowie i ile mieszkańców ma Kraków? Oblicz ile osób przypada na 1 stopień temperatury"*
+- *"Znajdź na Wikipedii wysokość Mont Blanc i przelicz ją na stopy (1 stopa = 0.3048 m)"*
+- *"Jakie hobby ma Andrzej Duda wg bazy prezydentów? Sprawdź na Wikipedii czy to prawda."*"""))
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1215,12 +1334,15 @@ def my_agent(question):
             print(f"\\n  Odpowiedź: {msg.content}")
             return
 
+        messages.append(msg)
         for tc in msg.tool_calls:
             fn = tc.function.name
             args = json.loads(tc.function.arguments)
             print(f"  Krok {step+1}: {fn}({args})")
-            result = AVAILABLE_TOOLS.get(fn, lambda **kw: "Nieznane narzędzie")(**args)
-            messages.append(msg)
+            try:
+                result = AVAILABLE_TOOLS.get(fn, lambda **kw: "Nieznane narzędzie")(**args)
+            except Exception as e:
+                result = f"Błąd: {e}"
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
 try:
@@ -1231,7 +1353,7 @@ except (TypeError, NameError):
 """))
 
 cells.append(h6_collapsed(
-    '###### <span style="color: #c17f24;">💡 Podpowiedź</span> '
+    '###### <span style="color: #c17f24;">Podpowiedź</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
@@ -1239,19 +1361,19 @@ Dla asystenta podróżniczego: `SYSTEM_PROMPT = "Jesteś asystentem podróżnicz
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 13: PODSUMOWANIE
+# SEKCJA 12: PODSUMOWANIE
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 13. Podsumowanie
+## 12. Podsumowanie
 
 ### Co zrobiliśmy?
 
-1. **Zdefiniowaliśmy narzędzia** — zwykłe funkcje Pythona z opisami
-2. **Opisaliśmy je dla LLM-a** — w formacie JSON Schema (standard branżowy)
-3. **Zobaczyliśmy pod maską** — co dokładnie LLM widzi, jak wybiera funkcję
-4. **Pydantic** — ustrukturyzowane odpowiedzi narzędzi + automatyczne JSON Schema
-5. **Structured Output** — `instructor` wymusza format odpowiedzi LLM-a (z uzasadnieniem, pewnością, źródłami)
+1. **Pydantic** — ustrukturyzowane dane + automatyczne JSON Schema + walidacja
+2. **Narzędzia** — pogoda (prawdziwe API!), kalkulator, baza prezydentów, Wikipedia, web search
+3. **Pod maską** — co dokładnie LLM widzi, jak wybiera funkcję
+4. **JSON Schema** — ręcznie vs. automatycznie (Pydantic)
+5. **Structured Output** — `instructor` wymusza format odpowiedzi LLM-a
 6. **Pętla agentowa** — LLM sam decyduje które narzędzia wywołać i w jakiej kolejności
 
 ### Tak działają prawdziwe produkty AI
@@ -1271,11 +1393,13 @@ Wszystkie działają na tej samej zasadzie: **LLM + zestaw narzędzi + pętla ag
 
 **1. Description decyduje o wszystkim** — LLM wybiera narzędzie na podstawie opisu, nie kodu (ćwiczenie 1)
 
-**2. Pydantic to nie tylko walidacja** — automatycznie generuje JSON Schema, wymusza strukturę odpowiedzi
+**2. Pydantic to nie tylko walidacja** — automatycznie generuje JSON Schema, wymusza strukturę odpowiedzi narzędzi
 
 **3. `instructor` zamienia LLM w "wypełniacz formularzy"** — zamiast tekstu dostajesz obiekty z polami
 
-**4. Defensive coding jest konieczny** — web search może nie zadziałać, Wikipedia może zwrócić disambiguation, LLM może wybrać złe narzędzie
+**4. Agent jest tak dobry jak jego narzędzia** — fikcyjne fakty o prezydentach udowodniły, że LLM wierzy temu co mu podamy
+
+**5. Defensive coding jest konieczny** — web search może nie zadziałać, Wikipedia może zwrócić disambiguation, pogoda może być niedostępna (fallback!)
 
 </div>"""))
 
@@ -1293,7 +1417,7 @@ nb = {
             "language": "python",
             "name": "ml",
         },
-        "language_info": {"name": "python", "version": "3.9.0"},
+        "language_info": {"name": "python", "version": "3.11.0"},
     },
     "cells": [],
 }
