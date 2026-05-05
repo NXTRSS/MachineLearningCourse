@@ -389,3 +389,64 @@ def display_generated_city(prompt):
     """
     from IPython.display import display, Markdown
     display(Markdown(f"## 🏘️ **Wygenerowana nazwa miasta:** `{prompt[1:-1].title()}`"))
+
+
+def visualize_probabilities(probabilities, step, tokenizer, prompt, chosen_idx, show=True):
+    """Rysuje rozkład prawdopodobieństw kolejnego znaku w Modelu Języka.
+
+    Słupek wybranego znaku (`chosen_idx`) jest oznaczony na czerwono. Jeżeli
+    sampling stochastyczny wybrał coś innego niż argmax — argmax jest dodatkowo
+    oznaczony na pomarańczowo, a druga linia tytułu informuje o tym fakcie.
+
+    Argumenty:
+        probabilities  - 1D ndarray z prawdopodobieństwami dla wszystkich tokenów (z paddingiem 0)
+        step           - numer kroku w generacji (do tytułu)
+        tokenizer      - keras Tokenizer z mapą `index_word`
+        prompt         - dotychczasowy wynik generacji (do tytułu)
+        chosen_idx     - indeks tokena wybranego w tym kroku
+        show           - czy od razu pokazać wykres (False przy zbieraniu wielu kroków)
+    """
+    # pomijamy pozycję 0 (padding) — wszystkie indeksy znaków zaczynają się od 1
+    characters = [char for idx, char in tokenizer.index_word.items() if idx > 0]
+    probs = probabilities[1:]
+
+    chosen_pos = int(chosen_idx) - 1
+    argmax_pos = int(probs.argmax())
+    chosen_char = tokenizer.index_word.get(int(chosen_idx), '?')
+    chosen_prob = float(probs[chosen_pos]) if 0 <= chosen_pos < len(probs) else 0.0
+
+    # kolory słupków: chosen — czerwony, argmax (jeśli inny) — pomarańczowy, reszta — szary
+    colors = ['#cfd8dc'] * len(characters)
+    if argmax_pos != chosen_pos and 0 <= argmax_pos < len(colors):
+        colors[argmax_pos] = '#f39c12'
+    if 0 <= chosen_pos < len(colors):
+        colors[chosen_pos] = '#e74c3c'
+
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.bar(characters, probs, color=colors, edgecolor='white', linewidth=0.5)
+
+    # tytuł — pierwsza linia neutralna, druga linia kolorowa zależnie od decyzji
+    line1 = f'Krok {step} — dotychczasowy wynik: {prompt}'
+    if argmax_pos == chosen_pos:
+        line2 = f'Wybrano "{chosen_char}" (P={chosen_prob:.3f}) — najwyższe prawdopodobieństwo'
+        line2_color = '#1e8449'
+    else:
+        argmax_char = tokenizer.index_word.get(argmax_pos + 1, '?')
+        argmax_prob = float(probs[argmax_pos])
+        line2 = (f'Wybrano "{chosen_char}" (P={chosen_prob:.3f}) — '
+                 f'NIE najwyższe; argmax był "{argmax_char}" (P={argmax_prob:.3f})')
+        line2_color = '#c0392b'
+
+    ax.set_title(line1, fontsize=12, fontweight='bold', loc='left', pad=22)
+    ax.text(0, 1.02, line2, transform=ax.transAxes, fontsize=10, color=line2_color)
+
+    ax.set_xlabel('Znaki')
+    ax.set_ylabel('Prawdopodobieństwo')
+    ax.set_ylim(0, 1)
+    ax.tick_params(axis='x', rotation=45)
+    ax.grid(axis='y', alpha=0.3)
+    ax.spines[['top', 'right']].set_visible(False)
+
+    plt.tight_layout()
+    if show:
+        plt.show()
