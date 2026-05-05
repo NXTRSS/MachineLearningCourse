@@ -1,0 +1,50 @@
+name: Check commit author
+
+on: [push, pull_request]
+
+jobs:
+  check-author:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject unwanted authors/committers
+        run: |
+          BLOCKED_EMAILS="kamil.jedryczek@airslate.com"
+          BLOCKED_NAMES="claude"
+
+          FAILED=0
+
+          for COMMIT in $(git rev-list origin/main..HEAD 2>/dev/null || git rev-list HEAD~5..HEAD); do
+            AUTHOR_NAME=$(git log -1 --format='%an' "$COMMIT")
+            AUTHOR_EMAIL=$(git log -1 --format='%ae' "$COMMIT")
+            COMMITTER_NAME=$(git log -1 --format='%cn' "$COMMIT")
+            COMMITTER_EMAIL=$(git log -1 --format='%ce' "$COMMIT")
+
+            for EMAIL in $BLOCKED_EMAILS; do
+              if [ "$AUTHOR_EMAIL" = "$EMAIL" ] || [ "$COMMITTER_EMAIL" = "$EMAIL" ]; then
+                echo "::error::Commit $COMMIT has blocked email: $EMAIL"
+                FAILED=1
+              fi
+            done
+
+            for NAME in $BLOCKED_NAMES; do
+              AUTHOR_LOWER=$(echo "$AUTHOR_NAME" | tr '[:upper:]' '[:lower:]')
+              COMMITTER_LOWER=$(echo "$COMMITTER_NAME" | tr '[:upper:]' '[:lower:]')
+              if [ "$AUTHOR_LOWER" = "$NAME" ] || [ "$COMMITTER_LOWER" = "$NAME" ]; then
+                echo "::error::Commit $COMMIT has blocked author/committer name: $NAME"
+                FAILED=1
+              fi
+            done
+          done
+
+          if [ "$FAILED" = "1" ]; then
+            echo ""
+            echo "Użyj: git commit --author='NXTRSS <kamillo_j@yahoo.com>'"
+            echo "Lub popraw historię: git filter-branch / git rebase --exec"
+            exit 1
+          fi
+
+          echo "All commits OK — author/committer check passed."
