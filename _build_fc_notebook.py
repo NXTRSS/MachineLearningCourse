@@ -106,9 +106,19 @@ print("Pakiety załadowane!")\
 cells.append(md("""\
 ## 2. Połączenie z LLM-em
 
-Automatycznie szukamy LM Studio (port 1234), lokalnej Ollamy (port 11434), lub serwera prowadzącego.
+Poniższa komórka automatycznie szuka działającego LLM-a. Zanim ją uruchomisz:
 
-**Ważne:** Function calling działa najlepiej z modelami: `qwen3.5:4b+`, `gemma4:4b+`, `qwen3:8b+`"""))
+<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:12px; border-radius:4px;">
+
+**Upewnij się, że LLM jest uruchomiony!**
+
+- **LM Studio** — otwórz aplikację → załaduj model → upewnij się że serwer jest włączony (zakładka *Local Server*, zielony przycisk *Start Server*)
+- **Ollama** — na macOS zwykle startuje automatycznie. Jeśli nie: otwórz terminal i wpisz `ollama serve`
+
+Szczegóły instalacji: patrz `setup_local_llm.ipynb` lub `docs/LOKALNE_LLM.md`
+</div>
+
+**Function calling działa najlepiej z modelami:** `qwen3.5:4b+`, `gemma4:4b+`, `qwen3:8b+`"""))
 
 cells.append(code("""\
 PREFERRED_MODELS = [
