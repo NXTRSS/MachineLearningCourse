@@ -592,6 +592,16 @@ LLM dostanie pytanie *"Jaka jest pogoda w Krakowie?"* ale widzi, że `get_weathe
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
+# SEKCJA 7: DODAJ NARZĘDZIE
+# ══════════════════════════════════════════════════════════════════════
+
+cells.append(md("""\
+## 7. Dodaj własne narzędzie
+
+Wiesz już jak LLM wybiera narzędzia na podstawie opisu.
+Pora dodać **własne** narzędzie do zestawu!"""))
+
+# ══════════════════════════════════════════════════════════════════════
 # ĆWICZENIE 2
 # ══════════════════════════════════════════════════════════════════════
 
