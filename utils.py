@@ -9,6 +9,19 @@ import matplotlib.pyplot as plt
 import io
 import tensorflow as tf
 
+def ensure_package(package_name, pip_name=None):
+    """Instaluje pakiet jeśli nie jest dostępny. Użyj pip_name gdy nazwa pip != import."""
+    import importlib
+    try:
+        importlib.import_module(package_name)
+    except ImportError:
+        import subprocess, sys
+        pip_name = pip_name or package_name
+        print(f"Instaluję {pip_name}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", pip_name])
+        print(f"✅ {pip_name} zainstalowany!")
+
+
 DATA_FILES = {
     "catvsnotcat": {
         "file_id": "1KE3IOH0OxPI5QTeV2WI9Oi8GIVTBC8vw",
