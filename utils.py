@@ -452,6 +452,119 @@ def visualize_probabilities(probabilities, step, tokenizer, prompt, chosen_idx, 
         plt.show()
 
 
+# ─────────────────────────── LLM auto-detect ────────────────────────────
+
+PREFERRED_MODELS = [
+    "qwen3.5:27b", "qwen3.5:9b", "qwen3.5:4b",
+    "qwen3:14b", "qwen3:8b",
+    "gemma4:12b", "gemma4:4b",
+    "gemma3:27b", "gemma3:12b", "gemma3:8b",
+    "qwen2.5:14b", "qwen2.5:7b",
+    "gemma2:9b", "mistral:7b", "llama3.1:8b",
+    "qwen3.5:2b", "qwen3.5:0.8b",
+    "qwen3:4b", "qwen3:1.7b", "qwen3:0.6b",
+    "gemma4:e4b", "gemma4:e2b",
+    "gemma3:4b", "gemma3:1b", "qwen2.5:3b",
+]
+
+
+def detect_ollama(base_url="http://localhost:11434"):
+    import requests
+    headers = {"ngrok-skip-browser-warning": "true"} if "ngrok" in base_url else {}
+    try:
+        r = requests.get(f"{base_url}/api/tags", timeout=3, headers=headers)
+        if r.status_code == 200:
+            return [m["name"] for m in r.json().get("models", [])]
+    except Exception:
+        pass
+    return []
+
+
+def detect_lmstudio(base_url="http://localhost:1234"):
+    import requests
+    try:
+        r = requests.get(f"{base_url}/api/v1/models", timeout=3)
+        if r.status_code == 200:
+            models = r.json().get("models", [])
+            return [m["key"] for m in models if m.get("type") == "llm"]
+    except Exception:
+        pass
+    return []
+
+
+def _try_launch_lms():
+    import shutil, subprocess, time
+    if not shutil.which("lms"):
+        return False
+    try:
+        subprocess.Popen(
+            ["lms", "server", "start"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        print("  Uruchamiam LM Studio (`lms server start`)...")
+        for _ in range(6):
+            time.sleep(2)
+            if detect_lmstudio():
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def pick_best_model(available_models, preferred=None):
+    preferred = preferred or PREFERRED_MODELS
+    for p in preferred:
+        pname = p.split(":")[0]
+        for a in available_models:
+            if pname in a:
+                return a
+    return available_models[0] if available_models else None
+
+
+def connect_llm(instructor_server="http://192.168.1.100:11434"):
+    """Wykryj działający LLM i zwróć (OpenAI_client, model_name, base_url).
+
+    Kolejność prób: LM Studio → auto-launch lms → Ollama → serwer prowadzącego.
+    Zwraca (None, None, None) jeśli nic nie znalezione.
+    """
+    from openai import OpenAI
+
+    # 1) LM Studio
+    print("Szukam LM Studio (port 1234)...")
+    models = detect_lmstudio()
+    if not models:
+        models = _try_launch_lms() and detect_lmstudio()
+    if models:
+        model = pick_best_model(models) or models[0]
+        url = "http://localhost:1234"
+        client = OpenAI(base_url=f"{url}/v1", api_key="lm-studio")
+        print(f"✓ LM Studio! Model: {model}")
+        return client, model, url
+
+    # 2) Ollama lokalna
+    print("  LM Studio niedostępne.\nSzukam lokalnej Ollamy (port 11434)...")
+    models = detect_ollama()
+    if models:
+        model = pick_best_model(models)
+        url = "http://localhost:11434"
+        client = OpenAI(base_url=f"{url}/v1", api_key="ollama")
+        print(f"✓ Lokalna Ollama! Model: {model}")
+        return client, model, url
+
+    # 3) Serwer prowadzącego
+    if instructor_server:
+        print("  Ollama niedostępna.\nPróbuję serwer prowadzącego...")
+        models = detect_ollama(instructor_server)
+        if models:
+            model = pick_best_model(models)
+            client = OpenAI(base_url=f"{instructor_server}/v1", api_key="ollama")
+            print(f"✓ Serwer prowadzącego! Model: {model}")
+            return client, model, instructor_server
+
+    print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
+    return None, None, None
+
+
 # ─────────────────────────── ensure_package ───────────────────────────
 
 def ensure_package(pip_name, import_name=None):
