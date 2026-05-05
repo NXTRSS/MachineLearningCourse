@@ -83,15 +83,7 @@ LLM: "W Krakowie jest 18°C i słonecznie!"
 cells.append(md("## 1. Konfiguracja środowiska"))
 
 cells.append(code("""\
-import subprocess, sys
-
-def ensure_package(pip_name, import_name=None):
-    import_name = import_name or pip_name
-    try:
-        __import__(import_name)
-    except ImportError:
-        print(f"Instaluję {pip_name}...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", pip_name])
+from utils import ensure_package
 
 ensure_package("openai")
 ensure_package("pydantic")
