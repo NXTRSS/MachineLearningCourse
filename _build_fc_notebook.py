@@ -87,7 +87,6 @@ from utils import ensure_package
 
 ensure_package("openai")
 ensure_package("pydantic")
-ensure_package("eval-type-backport", "eval_type_backport")  # Python <3.10 compat
 ensure_package("instructor")
 ensure_package("wikipedia")
 ensure_package("ddgs")
