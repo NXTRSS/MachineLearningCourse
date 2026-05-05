@@ -2,7 +2,7 @@
 name = "machine-learning-course"
 version = "1.0.0"
 description = "Zajęcia z Uczenia Maszynowego - Python Podyplomowe"
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     # TensorFlow — od 2.16 ma realne wheels na wszystkich platformach
     # (2.15 miał stuby 2KB na macOS ARM64/Linux ARM64)
