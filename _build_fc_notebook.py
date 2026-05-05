@@ -209,9 +209,23 @@ Każde narzędzie zwraca dane w formacie JSON — dzięki Pydantic!
 
 Narzędzie próbuje pobrać **prawdziwą pogodę** z darmowego API [wttr.in](https://wttr.in).
 Jeśli API jest niedostępne (brak internetu, timeout) — automatycznie przełącza się
-na **dane zastępcze** (mock) z odpowiednim komunikatem."""))
+na **dane zastępcze** (mock).
+
+Zwróć uwagę na wzorzec **`MaybeWeather`** — model Pydantic który *opakowuje* `WeatherReport`
+i dodaje metadane: czy dane są prawdziwe (`success`) i skąd pochodzą (`source`).
+Dzięki temu LLM **strukturalnie wie** czy pogoda jest aktualna czy mockowana
+— zamiast parsować tekst `"(uwaga: dane zastępcze...)"`.
+
+To jest **kompozycja modeli** — model w modelu — częsty wzorzec w produkcyjnych systemach."""))
 
 cells.append(code("""\
+class MaybeWeather(BaseModel):
+    \"\"\"Wrapper: WeatherReport + metadane o źródle danych.\"\"\"
+    success: bool = Field(..., description="Czy udało się pobrać dane z API")
+    source: Literal["wttr.in", "dane zastępcze"] = Field(..., description="Skąd pochodzą dane")
+    report: WeatherReport = Field(..., description="Raport pogodowy")
+
+
 MOCK_WEATHER = {
     "Kraków":   {"temp": 18, "opis": "słonecznie",              "wilgotność": 45},
     "Warszawa": {"temp": 15, "opis": "pochmurno",               "wilgotność": 70},
@@ -243,7 +257,7 @@ def get_weather(city: str) -> str:
             conditions=desc_list[0]["value"],
             humidity_percent=int(current["humidity"]),
         )
-        return report.model_dump_json(indent=2)
+        return MaybeWeather(success=True, source="wttr.in", report=report).model_dump_json(indent=2)
     except Exception:
         pass
 
@@ -256,7 +270,7 @@ def get_weather(city: str) -> str:
             conditions=m["opis"],
             humidity_percent=m["wilgotność"],
         )
-        return "(uwaga: dane zastępcze — brak połączenia z wttr.in)\\n" + report.model_dump_json(indent=2)
+        return MaybeWeather(success=False, source="dane zastępcze", report=report).model_dump_json(indent=2)
 
     return json.dumps({"error": f"Brak danych pogodowych dla: {city}"}, ensure_ascii=False)
 
