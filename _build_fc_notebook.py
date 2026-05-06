@@ -128,7 +128,7 @@ cells.append(code("""\
 from utils import connect_llm
 
 # Jeśli nie masz lokalnego LLM-a, wpisz adres serwera prowadzącego (podany na zajęciach):
-LECTURER_SERVER = "http://192.168.1.100:4242"
+LECTURER_SERVER = "http://ADRES_SERWERA:PORT"  # ← prowadzący poda na zajęciach
 
 client, instructor_client, MODEL_NAME = connect_llm(lecturer_server=LECTURER_SERVER)
 
