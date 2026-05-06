@@ -295,7 +295,76 @@ Kluczowe: **LLM nie liczy sam** — prosi NASZ kod o obliczenie. My kontrolujemy
 
 </div>
 
-Teraz dodamy więcej narzędzi — pogodę i bazę prezydentów."""))
+Teraz dodamy więcej narzędzi — pogodę i bazę prezydentów.
+
+Ale najpierw — **zauważyłeś, że `calc_tool` to ręcznie pisany JSON Schema?**
+Był poręczny do nauki — widać dokładnie co LLM dostaje.
+Ale pisanie tego ręcznie dla każdego narzędzia to błędogenna robota.
+
+**Pydantic umie wygenerować ten sam schemat automatycznie!**"""))
+
+cells.append(code("""\
+# Przypomnijmy — ręczny JSON Schema naszego kalkulatora:
+print("RĘCZNIE napisany schemat (calc_tool → parameters):")
+print(json.dumps(calc_tool["function"]["parameters"], indent=2, ensure_ascii=False))
+
+# A teraz — Pydantic generuje to samo z klasy!
+class CalculateArgs(BaseModel):
+    expression: str = Field(..., description="Wyrażenie matematyczne, np. '2+2', 'sqrt(144)'")
+
+print("\\nPYDANTIC wygenerowany schemat (CalculateArgs.model_json_schema()):")
+print(json.dumps(CalculateArgs.model_json_schema(), indent=2, ensure_ascii=False))
+
+# Jedyna różnica: Pydantic dodaje "title" — reszta identyczna!
+# LLM ignoruje title, więc to nie ma znaczenia.\
+"""))
+
+cells.append(code("""\
+# Helper — generuje definicję narzędzia z modelu Pydantic.
+# Nigdy więcej ręcznego JSON Schema!
+
+def make_tool(name, description, args_model):
+    \"\"\"Tworzy definicję narzędzia FC z modelu Pydantic — zero ręcznego JSON Schema!\"\"\"
+    schema = args_model.model_json_schema()
+    schema.pop("title", None)  # OpenAI nie potrzebuje tytułu klasy
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": schema,
+        }
+    }
+
+# Test — porównajmy ręczny calc_tool z automatycznym:
+calc_tool_auto = make_tool(
+    "calculate",
+    "Wykonuje obliczenie matematyczne. Użyj gdy trzeba coś policzyć.",
+    CalculateArgs,
+)
+
+print("Ręczny calc_tool:")
+print(json.dumps(calc_tool["function"]["parameters"], indent=2))
+print("\\nAutomatyczny (make_tool + Pydantic):")
+print(json.dumps(calc_tool_auto["function"]["parameters"], indent=2))
+print("\\nOd teraz używamy make_tool() — Pydantic pisze JSON Schema za nas!")\
+"""))
+
+cells.append(md("""\
+<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:12px; border-radius:4px;">
+
+**Podsumowanie: JSON Schema na dwa sposoby**
+
+| | Ręcznie | Pydantic |
+|---|---|---|
+| **Jak** | Piszesz `{"type": "object", "properties": {...}}` | Piszesz `class Args(BaseModel): ...` |
+| **Schema** | Ty go tworzysz | `model_json_schema()` generuje automatycznie |
+| **Błędy** | Łatwo o literówkę | Pydantic waliduje za Ciebie |
+| **Kiedy** | Żeby zrozumieć co siedzi pod spodem | W produkcji — zawsze |
+
+Od tej pory będziemy definiować narzędzia przez **modele Pydantic + `make_tool()`**.
+
+</div>"""))
 
 # === 3b: INSTRUCTOR DEMO ===
 
@@ -671,67 +740,42 @@ for q in test_queries:
 cells.append(md("""\
 ## 6. Trzy narzędzia — LLM wybiera!
 
-Mamy kalkulator, pogodę i prezydentów. Teraz złóżmy je razem — opiszemy
-wszystkie trzy w JSON Schema i zobaczmy jak LLM **sam wybiera** odpowiednie narzędzie."""))
+Mamy kalkulator, pogodę i prezydentów. Teraz złóżmy je razem.
+
+W sekcji 3 zdefiniowaliśmy `make_tool()` i `CalculateArgs` — teraz dodamy
+modele Pydantic dla pozostałych narzędzi i sklejmy wszystko razem."""))
 
 cells.append(code("""\
+# Modele Pydantic dla argumentów każdego narzędzia
+# (CalculateArgs już mamy z sekcji 3)
+
+class GetWeatherArgs(BaseModel):
+    city: str = Field(..., description="Nazwa miasta, np. 'Kraków', 'Warszawa'")
+
+class SearchPresidentsArgs(BaseModel):
+    query: str = Field(..., description="Pytanie o prezydentów, np. 'kto rządził najdłużej', 'mało znane fakty', 'Kwaśniewski'")
+
+# Składamy tools_definition za pomocą make_tool()
 tools_definition = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_weather",
-            "description": "Sprawdza aktualną pogodę w podanym mieście. Użyj gdy użytkownik pyta o pogodę.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "city": {
-                        "type": "string",
-                        "description": "Nazwa miasta, np. 'Kraków', 'Warszawa'"
-                    }
-                },
-                "required": ["city"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "calculate",
-            "description": "Wykonuje obliczenie matematyczne. Użyj gdy trzeba coś policzyć.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "expression": {
-                        "type": "string",
-                        "description": "Wyrażenie matematyczne, np. '2+2', 'sqrt(144)'"
-                    }
-                },
-                "required": ["expression"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_presidents",
-            "description": "Przeszukuje bazę danych o prezydentach Polski (III RP) — rozumie pytania semantycznie. Zawiera kadencje, partie, wykształcenie, kluczowe wydarzenia i mało znane fakty. Użyj gdy pytanie dotyczy prezydentów RP.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Pytanie o prezydentów, np. 'kto rządził najdłużej', 'mało znane fakty', 'Kwaśniewski'"
-                    }
-                },
-                "required": ["query"]
-            }
-        }
-    }
+    make_tool("get_weather",
+              "Sprawdza aktualną pogodę w podanym mieście. Użyj gdy użytkownik pyta o pogodę.",
+              GetWeatherArgs),
+    make_tool("calculate",
+              "Wykonuje obliczenie matematyczne. Użyj gdy trzeba coś policzyć.",
+              CalculateArgs),
+    make_tool("search_presidents",
+              "Przeszukuje bazę danych o prezydentach Polski (III RP) — rozumie pytania semantycznie. "
+              "Zawiera kadencje, partie, wykształcenie, kluczowe wydarzenia i mało znane fakty. "
+              "Użyj gdy pytanie dotyczy prezydentów RP.",
+              SearchPresidentsArgs),
 ]
 
 print("LLM ma teraz 3 narzędzia do wyboru:")
 for t in tools_definition:
-    print(f"  {t['function']['name']}: {t['function']['description'][:60]}...")\
+    print(f"  {t['function']['name']}: {t['function']['description'][:60]}...")
+
+print("\\nPrzykładowa definicja (get_weather):")
+print(json.dumps(tools_definition[0], indent=2, ensure_ascii=False))\
 """))
 
 cells.append(code("""\
@@ -893,9 +937,9 @@ def get_population(city: str) -> str:
 
 ...  # Tutaj wpisz swój kod
 
-# Krok 4: Dodaj definicję JSON Schema do tools_definition
+# Krok 4: Dodaj definicję do tools_definition (użyj make_tool!)
 
-...  # Tutaj wpisz swój kod
+...  # Tutaj wpisz swój kod — potrzebujesz model Pydantic dla argumentów + make_tool()
 
 # --- TEST ---
 try:
@@ -913,7 +957,7 @@ cells.append(h6_collapsed(
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
-Wzoruj się na `get_weather` — słownik z danymi, Pydantic model z `Field(...)`, zwrócenie `.model_dump_json()`. Do `tools_definition` dodaj element `.append({...})` z kluczami `type`, `function` (zawierającym `name`, `description`, `parameters`)."""))
+Wzoruj się na `get_weather` — słownik z danymi, Pydantic model z `Field(...)`, zwrócenie `.model_dump_json()`. Do `tools_definition` użyj `make_tool()` — potrzebujesz model Pydantic dla **argumentów** (tu: `city: str`) + `tools_definition.append(make_tool("get_population", "...", GetPopulationArgs))`."""))
 cells.append(h6_collapsed(
     '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
@@ -937,20 +981,12 @@ def get_population(city: str) -> str:
 
 AVAILABLE_TOOLS["get_population"] = get_population
 
-tools_definition.append({
-    "type": "function",
-    "function": {
-        "name": "get_population",
-        "description": "Zwraca przybliżoną liczbę mieszkańców polskiego miasta.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "city": {"type": "string", "description": "Nazwa miasta, np. 'Kraków'"}
-            },
-            "required": ["city"]
-        }
-    }
-})
+class GetPopulationArgs(BaseModel):
+    city: str = Field(..., description="Nazwa miasta, np. 'Kraków'")
+
+tools_definition.append(
+    make_tool("get_population", "Zwraca przybliżoną liczbę mieszkańców polskiego miasta.", GetPopulationArgs)
+)
 ```"""))
 cells.append(separator())
 
@@ -1014,7 +1050,7 @@ cells.append(h6_collapsed(
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
-Model Pydantic: 3 pola z `Field(...)`. Funkcja: `wikipedia.search()` zwraca listę tytułów, `wikipedia.page()` zwraca stronę z polami `.title`, `.url`, `.summary`. Uważaj na `DisambiguationError` — złap go w `try/except`. Narzędzie zwraca `WikiArticle(...).model_dump_json()` — JSON z Pydantic modelu."""))
+Model Pydantic: 3 pola z `Field(...)`. Funkcja: `wikipedia.search()` zwraca listę tytułów, `wikipedia.page()` zwraca stronę z polami `.title`, `.url`, `.summary`. Uważaj na `DisambiguationError` — złap go w `try/except`. Narzędzie zwraca `WikiArticle(...).model_dump_json()`. Do rejestracji: model Pydantic dla **argumentów** + `make_tool()`."""))
 cells.append(h6_collapsed(
     '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
@@ -1050,20 +1086,15 @@ def search_wikipedia(query: str) -> str:
 
 AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
 
-tools_definition.append({
-    "type": "function",
-    "function": {
-        "name": "search_wikipedia",
-        "description": "Przeszukuje Wikipedię i zwraca streszczenie artykułu. Użyj gdy pytanie dotyczy wiedzy ogólnej, historii, nauki, geografii.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Zapytanie do Wikipedii, np. 'fotosynteza', 'Nikola Tesla'"}
-            },
-            "required": ["query"]
-        }
-    }
-})
+class SearchWikipediaArgs(BaseModel):
+    query: str = Field(..., description="Zapytanie do Wikipedii, np. 'fotosynteza', 'Nikola Tesla'")
+
+tools_definition.append(
+    make_tool("search_wikipedia",
+              "Przeszukuje Wikipedię i zwraca streszczenie artykułu. "
+              "Użyj gdy pytanie dotyczy wiedzy ogólnej, historii, nauki, geografii.",
+              SearchWikipediaArgs)
+)
 ```"""))
 cells.append(separator())
 
@@ -1117,20 +1148,16 @@ def search_web(query: str) -> str:
 
 
 AVAILABLE_TOOLS["search_web"] = search_web
-tools_definition.append({
-    "type": "function",
-    "function": {
-        "name": "search_web",
-        "description": "Przeszukuje internet przez DuckDuckGo. Użyj TYLKO gdy potrzebujesz aktualnych informacji, których nie ma na Wikipedii ani w bazie prezydentów.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Zapytanie do wyszukiwarki"}
-            },
-            "required": ["query"]
-        }
-    }
-})
+
+class SearchWebArgs(BaseModel):
+    query: str = Field(..., description="Zapytanie do wyszukiwarki")
+
+tools_definition.append(
+    make_tool("search_web",
+              "Przeszukuje internet przez DuckDuckGo. Użyj TYLKO gdy potrzebujesz aktualnych informacji, "
+              "których nie ma na Wikipedii ani w bazie prezydentów.",
+              SearchWebArgs)
+)
 
 print("Narzędzie search_web dodane!")
 print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
