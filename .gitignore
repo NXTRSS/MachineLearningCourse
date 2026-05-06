@@ -27,7 +27,9 @@ CLAUDE.md
 CLAUDE_NOTEBOOK_KONWENCJE.md
 STUBY_RESETOWANIE.md
 przed_zajeciami.py
+_build_fc_notebook.py
 oznacz_stub.py
+wyczysc_logi.py
 zaladuj_modele.py
 nn_hyperparams_search.py
 nn_search_results.json
