@@ -521,45 +521,69 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
-def connect_llm(instructor_server="http://192.168.1.100:11434"):
-    """Wykryj działający LLM i zwróć (OpenAI_client, model_name, base_url).
+def connect_llm(lecturer_server="http://192.168.1.100:4242"):
+    """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
-    Kolejność prób: LM Studio → auto-launch lms → Ollama → serwer prowadzącego.
+    Kolejność prób:
+      1. LM Studio lokalne (port 1234)
+      2. Auto-launch LM Studio (jeśli `lms` w PATH)
+      3. Ollama lokalna (port 11434)
+      4. Serwer prowadzącego — próbuje LM Studio, potem Ollama
+
+    Zwraca:
+        client           — do function calling (tools=)
+        instructor_client — do structured output (response_model=), lub None
+        model_name       — nazwa modelu
+
     Zwraca (None, None, None) jeśli nic nie znalezione.
     """
     from openai import OpenAI
 
-    # 1) LM Studio
+    def _make_clients(base_url, api_key, model):
+        """Tworzy oba klienty: zwykły + instructor."""
+        client = OpenAI(base_url=f"{base_url}/v1", api_key=api_key)
+        try:
+            import instructor
+            instr = instructor.from_openai(client, mode=instructor.Mode.JSON)
+        except Exception:
+            instr = None
+        return client, instr, model
+
+    # 1) LM Studio lokalne
     print("Szukam LM Studio (port 1234)...")
     models = detect_lmstudio()
     if not models:
         models = _try_launch_lms() and detect_lmstudio()
     if models:
         model = pick_best_model(models) or models[0]
-        url = "http://localhost:1234"
-        client = OpenAI(base_url=f"{url}/v1", api_key="lm-studio")
         print(f"✓ LM Studio! Model: {model}")
-        return client, model, url
+        return _make_clients("http://localhost:1234", "lm-studio", model)
 
     # 2) Ollama lokalna
     print("  LM Studio niedostępne.\nSzukam lokalnej Ollamy (port 11434)...")
     models = detect_ollama()
     if models:
         model = pick_best_model(models)
-        url = "http://localhost:11434"
-        client = OpenAI(base_url=f"{url}/v1", api_key="ollama")
         print(f"✓ Lokalna Ollama! Model: {model}")
-        return client, model, url
+        return _make_clients("http://localhost:11434", "ollama", model)
 
-    # 3) Serwer prowadzącego
-    if instructor_server:
-        print("  Ollama niedostępna.\nPróbuję serwer prowadzącego...")
-        models = detect_ollama(instructor_server)
+    # 3) Serwer prowadzącego — próbuj LM Studio, potem Ollama
+    if lecturer_server:
+        print(f"  Lokalny LLM niedostępny.\nPróbuję serwer prowadzącego ({lecturer_server})...")
+
+        # 3a) LM Studio na serwerze prowadzącego
+        models = detect_lmstudio(lecturer_server)
+        if models:
+            model = pick_best_model(models) or models[0]
+            print(f"✓ Serwer prowadzącego (LM Studio)! Model: {model}")
+            return _make_clients(lecturer_server, "lm-studio", model)
+
+        # 3b) Ollama na serwerze prowadzącego
+        models = detect_ollama(lecturer_server)
         if models:
             model = pick_best_model(models)
-            client = OpenAI(base_url=f"{instructor_server}/v1", api_key="ollama")
-            print(f"✓ Serwer prowadzącego! Model: {model}")
-            return client, model, instructor_server
+            print(f"✓ Serwer prowadzącego (Ollama)! Model: {model}")
+            return _make_clients(lecturer_server, "ollama", model)
 
     print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
     return None, None, None
