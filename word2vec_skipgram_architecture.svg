@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100%" viewBox="0 0 680 800" role="img" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>Architektura Word2Vec Skip-gram z oknem rozmiaru 5 i k-hot wektorem target</title>
+<desc>Wizualizacja sieci Word2Vec z dłuższym zdaniem, sliding window rozmiaru 5 wokół "kot" i k-hot wektorem target z liniami loss od każdej jedynki</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<style>
+.t { font-size: 14px; fill: #2C2C2A; }
+.ts { font-size: 12px; fill: #5F5E5A; }
+.th { font-size: 14px; font-weight: 500; fill: #2C2C2A; }
+@media (prefers-color-scheme: dark) {
+.t { fill: #D3D1C7; }
+.ts { fill: #B4B2A9; }
+.th { fill: #D3D1C7; }
+}
+</style>
+</defs>
+
+<!-- Tło dla zapisanego pliku (ciemne, jak w chacie gdzie wyglądało najlepiej) -->
+<rect width="680" height="800" fill="#1F1F1D"/>
+
+<!-- =========================================== -->
+<!-- SEKCJA 1: ZDANIE ZE SLIDING WINDOW          -->
+<!-- =========================================== -->
+
+<text class="th" x="340" y="24" text-anchor="middle" fill="#D3D1C7" font-weight="500">Zdanie wejściowe ze sliding window (rozmiar = 5)</text>
+
+<text class="ts" x="68" y="62" text-anchor="middle" fill="#7F77DD" font-weight="500">kontekst</text>
+<text class="ts" x="148" y="62" text-anchor="middle" fill="#7F77DD" font-weight="500">kontekst</text>
+<text class="ts" x="228" y="62" text-anchor="middle" fill="#EF9F27" font-weight="500">środek (x)</text>
+<text class="ts" x="308" y="62" text-anchor="middle" fill="#7F77DD" font-weight="500">kontekst</text>
+<text class="ts" x="380" y="62" text-anchor="middle" fill="#7F77DD" font-weight="500">kontekst</text>
+
+<text class="ts" x="528" y="62" text-anchor="middle" fill="#888780">poza oknem</text>
+
+<rect x="20" y="70" width="395" height="42" rx="10" fill="#FAEEDA" stroke="#BA7517" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+<rect x="32" y="76" width="72" height="30" rx="6" fill="#AFA9EC" stroke="#3C3489" stroke-width="1"/>
+<text class="th" x="68" y="96" text-anchor="middle" fill="#26215C">mały</text>
+
+<rect x="112" y="76" width="72" height="30" rx="6" fill="#AFA9EC" stroke="#3C3489" stroke-width="1"/>
+<text class="th" x="148" y="96" text-anchor="middle" fill="#26215C">czarny</text>
+
+<rect x="192" y="74" width="72" height="34" rx="6" fill="#EF9F27" stroke="#854F0B" stroke-width="1.5"/>
+<text class="th" x="228" y="96" text-anchor="middle" fill="#412402">kot</text>
+
+<rect x="272" y="76" width="72" height="30" rx="6" fill="#AFA9EC" stroke="#3C3489" stroke-width="1"/>
+<text class="th" x="308" y="96" text-anchor="middle" fill="#26215C">pije</text>
+
+<rect x="352" y="76" width="56" height="30" rx="6" fill="#AFA9EC" stroke="#3C3489" stroke-width="1"/>
+<text class="th" x="380" y="96" text-anchor="middle" fill="#26215C">mleko</text>
+
+<rect x="420" y="76" width="88" height="30" rx="6" fill="#444441" stroke="#888780" stroke-width="0.5"/>
+<text class="th" x="464" y="96" text-anchor="middle" fill="#D3D1C7">codziennie</text>
+
+<rect x="516" y="76" width="32" height="30" rx="6" fill="#444441" stroke="#888780" stroke-width="0.5"/>
+<text class="th" x="532" y="96" text-anchor="middle" fill="#D3D1C7">z</text>
+
+<rect x="556" y="76" width="72" height="30" rx="6" fill="#444441" stroke="#888780" stroke-width="0.5"/>
+<text class="th" x="592" y="96" text-anchor="middle" fill="#D3D1C7">rana</text>
+
+<text class="ts" x="217" y="130" text-anchor="middle" fill="#BA7517" font-weight="500">↑ sliding window: środek + do 5 słów po każdej stronie ↑</text>
+<text class="ts" x="340" y="148" text-anchor="middle" fill="#888780">"kot" jest blisko początku, więc okno bierze tylko 2 w lewo i 2 w prawo (w oknie zmieściło się 4 słowa kontekstu)</text>
+
+<line x1="228" y1="160" x2="80" y2="200" stroke="#BA7517" stroke-width="1.2" marker-end="url(#arrow)" fill="none" opacity="0.7"/>
+<text class="ts" x="125" y="178" text-anchor="middle" fill="#BA7517">wejście x</text>
+
+<line x1="228" y1="160" x2="640" y2="200" stroke="#D85A30" stroke-width="1.2" marker-end="url(#arrow)" fill="none" opacity="0.7"/>
+<text class="ts" x="500" y="178" text-anchor="middle" fill="#D85A30">target ŷ (4 jedynki)</text>
+
+<!-- =========================================== -->
+<!-- SEKCJA 2: ARCHITEKTURA SIECI                -->
+<!-- =========================================== -->
+
+<text class="th" x="80" y="218" text-anchor="middle" fill="#D3D1C7">Wejście x</text>
+<text class="ts" x="80" y="234" text-anchor="middle">one-hot, V≈10k</text>
+
+<text class="th" x="310" y="218" text-anchor="middle" fill="#D3D1C7">Warstwa ukryta</text>
+<text class="ts" x="310" y="234" text-anchor="middle">N≈300 — BOTTLENECK</text>
+
+<text class="th" x="530" y="218" text-anchor="middle" fill="#D3D1C7">Wyjście softmax</text>
+<text class="ts" x="530" y="234" text-anchor="middle">rozkład, V≈10k</text>
+
+<text class="th" x="640" y="218" text-anchor="middle" fill="#D3D1C7">Target ŷ</text>
+<text class="ts" x="640" y="234" text-anchor="middle">k-hot</text>
+
+<text class="ts" x="195" y="261" text-anchor="middle" fill="#7F77DD">W (V × N)</text>
+<text class="ts" x="195" y="275" text-anchor="middle" fill="#7F77DD">macierz embedingów</text>
+
+<text class="ts" x="420" y="261" text-anchor="middle" fill="#5DCAA5">W' (N × V)</text>
+<text class="ts" x="420" y="275" text-anchor="middle" fill="#5DCAA5">macierz kontekstu</text>
+
+<!-- WARSTWA WEJŚCIOWA -->
+<g><circle cx="80" cy="305" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="80" y="309" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="80" cy="340" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="80" y="344" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="80" cy="375" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="80" y="379" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="80" cy="410" r="13" fill="#EF9F27" stroke="#854F0B" stroke-width="1"/><text class="ts" x="80" y="414" text-anchor="middle" fill="#412402" font-weight="500">1</text></g>
+<g><circle cx="80" cy="445" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="80" y="449" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="80" cy="480" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="80" y="484" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="80" cy="515" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="80" y="519" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="80" cy="550" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="80" y="554" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<text class="ts" x="80" y="580" text-anchor="middle" fill="#888780">⋮</text>
+<g><circle cx="80" cy="605" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="80" y="609" text-anchor="middle" fill="#D3D1C7">0</text></g>
+
+<text class="ts" x="35" y="414" text-anchor="end" fill="#EF9F27" font-weight="500">"kot"</text>
+
+<!-- WARSTWA UKRYTA -->
+<rect x="265" y="385" width="90" height="140" rx="12" fill="#3C3489" stroke="#7F77DD" stroke-width="1" stroke-dasharray="4 3" opacity="0.3"/>
+<text class="ts" x="310" y="380" text-anchor="middle" fill="#7F77DD" font-weight="500">↓ ściśnięcie ↓</text>
+
+<g><circle cx="310" cy="410" r="14" fill="#7F77DD" stroke="#CECBF6" stroke-width="0.5"/><text class="ts" x="310" y="414" text-anchor="middle" fill="#26215C" font-weight="500">h₁</text></g>
+<g><circle cx="310" cy="455" r="14" fill="#7F77DD" stroke="#CECBF6" stroke-width="0.5"/><text class="ts" x="310" y="459" text-anchor="middle" fill="#26215C" font-weight="500">h₂</text></g>
+<g><circle cx="310" cy="500" r="14" fill="#7F77DD" stroke="#CECBF6" stroke-width="0.5"/><text class="ts" x="310" y="504" text-anchor="middle" fill="#26215C" font-weight="500">h₃</text></g>
+
+<text class="ts" x="310" y="550" text-anchor="middle" fill="#AFA9EC" font-weight="500">wektor "kot"</text>
+<text class="ts" x="310" y="565" text-anchor="middle" fill="#AFA9EC">= W[index, :]</text>
+
+<!-- Połączenia: wejście -> ukryta -->
+<line x1="93" y1="410" x2="296" y2="410" stroke="#EF9F27" stroke-width="1.2" opacity="0.9"/>
+<line x1="93" y1="410" x2="296" y2="455" stroke="#EF9F27" stroke-width="1.2" opacity="0.9"/>
+<line x1="93" y1="410" x2="296" y2="500" stroke="#EF9F27" stroke-width="1.2" opacity="0.9"/>
+
+<line x1="91" y1="305" x2="296" y2="410" stroke="#888780" stroke-width="0.4" opacity="0.5"/>
+<line x1="91" y1="340" x2="296" y2="455" stroke="#888780" stroke-width="0.4" opacity="0.5"/>
+<line x1="91" y1="375" x2="296" y2="500" stroke="#888780" stroke-width="0.4" opacity="0.5"/>
+<line x1="91" y1="445" x2="296" y2="410" stroke="#888780" stroke-width="0.4" opacity="0.5"/>
+<line x1="91" y1="480" x2="296" y2="455" stroke="#888780" stroke-width="0.4" opacity="0.5"/>
+<line x1="91" y1="515" x2="296" y2="500" stroke="#888780" stroke-width="0.4" opacity="0.5"/>
+<line x1="91" y1="550" x2="296" y2="410" stroke="#888780" stroke-width="0.4" opacity="0.5"/>
+<line x1="91" y1="605" x2="296" y2="500" stroke="#888780" stroke-width="0.4" opacity="0.5"/>
+
+<!-- WARSTWA WYJŚCIOWA -->
+<g><circle cx="530" cy="305" r="11" fill="#444441" stroke="#5DCAA5" stroke-width="0.5"/><text class="ts" x="530" y="309" text-anchor="middle" fill="#D3D1C7">.02</text></g>
+<g><circle cx="530" cy="340" r="13" fill="#1D9E75" stroke="#9FE1CB" stroke-width="1"/><text class="ts" x="530" y="344" text-anchor="middle" fill="#04342C" font-weight="500">.24</text></g>
+<g><circle cx="530" cy="375" r="13" fill="#1D9E75" stroke="#9FE1CB" stroke-width="1"/><text class="ts" x="530" y="379" text-anchor="middle" fill="#04342C" font-weight="500">.19</text></g>
+<g><circle cx="530" cy="410" r="11" fill="#444441" stroke="#5DCAA5" stroke-width="0.5"/><text class="ts" x="530" y="414" text-anchor="middle" fill="#D3D1C7">.03</text></g>
+<g><circle cx="530" cy="445" r="13" fill="#1D9E75" stroke="#9FE1CB" stroke-width="1"/><text class="ts" x="530" y="449" text-anchor="middle" fill="#04342C" font-weight="500">.28</text></g>
+<g><circle cx="530" cy="480" r="11" fill="#444441" stroke="#5DCAA5" stroke-width="0.5"/><text class="ts" x="530" y="484" text-anchor="middle" fill="#D3D1C7">.02</text></g>
+<g><circle cx="530" cy="515" r="13" fill="#1D9E75" stroke="#9FE1CB" stroke-width="1"/><text class="ts" x="530" y="519" text-anchor="middle" fill="#04342C" font-weight="500">.21</text></g>
+<g><circle cx="530" cy="550" r="11" fill="#444441" stroke="#5DCAA5" stroke-width="0.5"/><text class="ts" x="530" y="554" text-anchor="middle" fill="#D3D1C7">.01</text></g>
+<text class="ts" x="530" y="580" text-anchor="middle" fill="#888780">⋮</text>
+<g><circle cx="530" cy="605" r="11" fill="#444441" stroke="#5DCAA5" stroke-width="0.5"/><text class="ts" x="530" y="609" text-anchor="middle" fill="#D3D1C7">.01</text></g>
+
+<!-- Połączenia: ukryta -> wyjściowa -->
+<line x1="324" y1="410" x2="517" y2="305" stroke="#5DCAA5" stroke-width="0.4" opacity="0.5"/>
+<line x1="324" y1="410" x2="517" y2="340" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="455" x2="517" y2="340" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="500" x2="517" y2="340" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="410" x2="517" y2="375" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="455" x2="517" y2="375" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="500" x2="517" y2="375" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="430" x2="517" y2="410" stroke="#5DCAA5" stroke-width="0.4" opacity="0.5"/>
+<line x1="324" y1="410" x2="517" y2="445" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="455" x2="517" y2="445" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="500" x2="517" y2="445" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="475" x2="517" y2="480" stroke="#5DCAA5" stroke-width="0.4" opacity="0.5"/>
+<line x1="324" y1="410" x2="517" y2="515" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="455" x2="517" y2="515" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="500" x2="517" y2="515" stroke="#1D9E75" stroke-width="1" opacity="0.9"/>
+<line x1="324" y1="500" x2="517" y2="550" stroke="#5DCAA5" stroke-width="0.4" opacity="0.5"/>
+<line x1="324" y1="500" x2="517" y2="605" stroke="#5DCAA5" stroke-width="0.4" opacity="0.5"/>
+
+<!-- Linie loss -->
+<path d="M 581 340 Q 605 340 627 340" stroke="#D85A30" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<path d="M 588 375 Q 608 375 627 375" stroke="#D85A30" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<path d="M 575 445 Q 600 445 627 445" stroke="#D85A30" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<path d="M 583 515 Q 605 515 627 515" stroke="#D85A30" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+
+<!-- Etykiety słów blisko zielonych nodów -->
+<text class="ts" x="546" y="344" text-anchor="start" fill="#5DCAA5" font-weight="500">"mały"</text>
+<text class="ts" x="546" y="379" text-anchor="start" fill="#5DCAA5" font-weight="500">"czarny"</text>
+<text class="ts" x="546" y="449" text-anchor="start" fill="#5DCAA5" font-weight="500">"pije"</text>
+<text class="ts" x="546" y="519" text-anchor="start" fill="#5DCAA5" font-weight="500">"mleko"</text>
+
+<!-- Tytuł loss -->
+<text class="ts" x="585" y="280" text-anchor="middle" fill="#F0997B" font-weight="500">loss = cross-entropy</text>
+<text class="ts" x="585" y="295" text-anchor="middle" fill="#F0997B">(softmax, ŷ)</text>
+
+<!-- WEKTOR TARGET ŷ -->
+<g><circle cx="640" cy="305" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="640" y="309" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="640" cy="340" r="13" fill="#D85A30" stroke="#F0997B" stroke-width="1"/><text class="ts" x="640" y="344" text-anchor="middle" fill="#4A1B0C" font-weight="500">1</text></g>
+<g><circle cx="640" cy="375" r="13" fill="#D85A30" stroke="#F0997B" stroke-width="1"/><text class="ts" x="640" y="379" text-anchor="middle" fill="#4A1B0C" font-weight="500">1</text></g>
+<g><circle cx="640" cy="410" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="640" y="414" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="640" cy="445" r="13" fill="#D85A30" stroke="#F0997B" stroke-width="1"/><text class="ts" x="640" y="449" text-anchor="middle" fill="#4A1B0C" font-weight="500">1</text></g>
+<g><circle cx="640" cy="480" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="640" y="484" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<g><circle cx="640" cy="515" r="13" fill="#D85A30" stroke="#F0997B" stroke-width="1"/><text class="ts" x="640" y="519" text-anchor="middle" fill="#4A1B0C" font-weight="500">1</text></g>
+<g><circle cx="640" cy="550" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="640" y="554" text-anchor="middle" fill="#D3D1C7">0</text></g>
+<text class="ts" x="640" y="580" text-anchor="middle" fill="#888780">⋮</text>
+<g><circle cx="640" cy="605" r="11" fill="#444441" stroke="#888780" stroke-width="0.5"/><text class="ts" x="640" y="609" text-anchor="middle" fill="#D3D1C7">0</text></g>
+
+<!-- Strzałki przepływu -->
+<line x1="150" y1="640" x2="245" y2="640" stroke="#7F77DD" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+<text class="ts" x="197" y="633" text-anchor="middle" fill="#AFA9EC">lookup wiersza W</text>
+
+<line x1="380" y1="640" x2="485" y2="640" stroke="#5DCAA5" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+<text class="ts" x="432" y="633" text-anchor="middle" fill="#5DCAA5">h · W' + softmax</text>
+
+<!-- Sedno -->
+<rect x="40" y="665" width="600" height="76" rx="8" fill="#3C3489" stroke="#7F77DD" stroke-width="0.5" opacity="0.25"/>
+<text class="ts" x="340" y="685" text-anchor="middle" fill="#CECBF6" font-weight="500">Bottleneck wymusza kompresję: V≈10 000 wymiarów → N≈300</text>
+<text class="ts" x="340" y="703" text-anchor="middle" fill="#AFA9EC">Wersja edukacyjna: ŷ ma 4 jedynki (wszystkie słowa kontekstu w oknie)</text>
+<text class="ts" x="340" y="719" text-anchor="middle" fill="#AFA9EC">W oryg. skip-gramie sieć puszcza się 4×, każdy raz z innym one-hotowym ŷ</text>
+<text class="ts" x="340" y="735" text-anchor="middle" fill="#AFA9EC">— efekt uczenia jest taki sam: embedding "kot" przyciąga się do wszystkich 4 słów</text>
+</svg>
