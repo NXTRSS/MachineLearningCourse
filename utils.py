@@ -608,7 +608,7 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
-def connect_llm(lecturer_server="http://192.168.1.100:1234"):
+def connect_llm(lecturer_server="http://192.168.1.100:4242"):
     """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
     Kolejność prób:
