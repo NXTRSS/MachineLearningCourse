@@ -47,11 +47,11 @@ cells.append(md("""\
 
 ### Plan warsztatu
 
-1. **Pydantic**: Nauczymy się definiować **strukturalne dane** — klucz do komunikacji z LLM-em
-2. **Narzędzia**: Zdefiniujemy funkcje Pythona, które LLM będzie mógł wywoływać (pogoda, kalkulator, baza prezydentów)
-3. **Pod maską**: Zobaczymy *dokładnie* co LLM widzi, jak wybiera funkcję, i co dostaje z powrotem
-4. **Wikipedia i web search**: Podłączymy prawdziwe źródła wiedzy
-5. **Structured Output**: Zmusimy LLM-a do odpowiadania w *ścisłym formacie* — z uzasadnieniem i źródłami
+1. **Kalkulator + pierwszy Function Call**: Zbudujemy narzędzie i od razu zobaczymy je w akcji!
+2. **Instructor**: Poznamy jak zmusić LLM-a do odpowiadania w ścisłym formacie Pydantic
+3. **Pogoda i prezydenci**: Dodamy poważniejsze narzędzia — z prawdziwym API i smart searchem
+4. **LLM wybiera**: Zobaczmy jak LLM sam decyduje którego narzędzia użyć
+5. **Wikipedia i web search**: Podłączymy prawdziwe źródła wiedzy
 6. **Pętla agentowa**: Zbudujemy mini-agenta który sam decyduje jakie narzędzia użyć
 
 ### Czym jest Function Calling?
@@ -126,29 +126,37 @@ Szczegóły instalacji: patrz `setup_local_llm.ipynb` lub `docs/LOKALNE_LLM.md`
 
 cells.append(code("""\
 from utils import connect_llm
+import instructor
 
 # Jeśli nie masz lokalnego LLM-a, wpisz adres serwera prowadzącego (podany na zajęciach):
 INSTRUCTOR_SERVER = "http://192.168.1.100:11434"
 
 client, MODEL_NAME, OLLAMA_URL = connect_llm(instructor_server=INSTRUCTOR_SERVER)
 
+# Instructor — wymusza na LLM-ie odpowiadanie w formacie Pydantic (z walidacją i retry)
+instructor_client = instructor.from_openai(
+    OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="lm-studio" if "1234" in OLLAMA_URL else "ollama"),
+    mode=instructor.Mode.JSON
+) if OLLAMA_URL else None
+
 if client:
-    print(f"\\nKlient LLM gotowy!\\nModel: {MODEL_NAME}")\
+    print(f"\\nKlient LLM gotowy!  Model: {MODEL_NAME}")
+    print(f"Instructor:         {'tak' if instructor_client else 'nie'}")
+    print()
+    print("Mamy DWA klienty:")
+    print("  client            → do function calling (LLM wybiera narzędzia)")
+    print("  instructor_client → do structured output (LLM odpowiada w formacie Pydantic)")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 3: PYDANTIC 101
+# SEKCJA 3: KALKULATOR — PIERWSZE NARZĘDZIE + PIERWSZY FC
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 3. Pydantic — ustrukturyzowane dane
+## 3. Kalkulator — twoje pierwsze narzędzie + Function Call!
 
-Zanim zaczniemy definiować narzędzia, poznajmy **Pydantic** — bibliotekę do definiowania
-schematów danych w Pythonie. Dlaczego?
-
-1. Nasze narzędzia będą zwracać **ustrukturyzowane dane** (nie surowe stringi)
-2. Pydantic automatycznie **generuje JSON Schema** — format którego LLM-y używają do opisu narzędzi
-3. Dane są **walidowane** — jeśli coś jest nie tak, dostaniemy błąd od razu
+Zacznijmy od **najprostszego** możliwego narzędzia — kalkulatora.
+Po drodze poznamy **Pydantic** (ustrukturyzowane dane) i zobaczymy **cały cykl Function Calling**.
 
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
 <b>Pydantic w jednym zdaniu:</b> Definiujesz klasę z polami i typami → Python automatycznie
@@ -156,7 +164,240 @@ waliduje dane i generuje schemat JSON — ten sam format którego używają Open
 </div>"""))
 
 cells.append(code("""\
-# Definiujemy "formularz" danych — model Pydantic:
+# Model Pydantic — "formularz" wyniku kalkulatora:
+
+class MathResult(BaseModel):
+    expression: str = Field(..., description="Wyrażenie matematyczne wejściowe")
+    result: float = Field(..., description="Wynik obliczenia")
+
+
+def calculate(expression: str) -> str:
+    \"\"\"
+    Wykonuje obliczenie matematyczne.
+
+    Args:
+        expression: Wyrażenie matematyczne, np. '2 + 2', 'sqrt(144)', '15 * 7'
+    \"\"\"
+    try:
+        allowed = {"sqrt": math.sqrt, "sin": math.sin, "cos": math.cos,
+                   "pi": math.pi, "abs": abs, "round": round, "pow": pow}
+        result = eval(expression, {"__builtins__": {}}, allowed)
+        return MathResult(expression=expression, result=float(result)).model_dump_json(indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Błąd w obliczeniu '{expression}': {e}"}, ensure_ascii=False)
+
+
+# Test:
+print("Wynik funkcji (JSON z Pydantic):")
+print(calculate("sqrt(144) + 7 * 3"))
+print()
+
+# Pydantic generuje JSON Schema automatycznie — to jest format który LLM rozumie:
+print("JSON Schema wygenerowany przez Pydantic:")
+print(json.dumps(MathResult.model_json_schema(), indent=2, ensure_ascii=False))\
+"""))
+
+cells.append(md("""\
+### Pierwszy Function Call — pod maską!
+
+Mamy narzędzie. Teraz **opiszemy** je dla LLM-a (w formacie JSON Schema)
+i wyślemy pytanie. LLM **sam zdecyduje** czy potrzebuje kalkulatora.
+
+Zobaczmy **dokładnie** co się dzieje na każdym etapie:"""))
+
+cells.append(code("""\
+# Opis narzędzia dla LLM-a (JSON Schema):
+calc_tool = {
+    "type": "function",
+    "function": {
+        "name": "calculate",
+        "description": "Wykonuje obliczenie matematyczne. Użyj gdy trzeba coś policzyć.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string",
+                    "description": "Wyrażenie matematyczne, np. '2+2', 'sqrt(144)'"
+                }
+            },
+            "required": ["expression"]
+        }
+    }
+}
+
+user_question = "Ile to jest 17 razy 23?"
+
+if OLLAMA_URL:
+    print("╔" + "═"*68 + "╗")
+    print("║  KROK 1: Wysyłamy pytanie + opis narzędzia do LLM-a            ║")
+    print("╚" + "═"*68 + "╝")
+    print(f"\\n  Pytanie: \\"{user_question}\\"")
+    print(f"  Narzędzie: calculate — {calc_tool['function']['description']}")
+    print(f"  → Wysyłam do {MODEL_NAME}...\\n")
+
+    messages = [
+        {"role": "system", "content": "Jesteś pomocnym asystentem. Odpowiadaj po polsku. Używaj narzędzi gdy to potrzebne."},
+        {"role": "user", "content": user_question}
+    ]
+
+    response = client.chat.completions.create(
+        model=MODEL_NAME, messages=messages, tools=[calc_tool], temperature=0.1
+    )
+
+    msg = response.choices[0].message
+
+    if msg.tool_calls:
+        tc = msg.tool_calls[0]
+        func_name = tc.function.name
+        func_args = json.loads(tc.function.arguments)
+
+        print("╔" + "═"*68 + "╗")
+        print("║  KROK 2: LLM wybrał narzędzie!                                ║")
+        print("╚" + "═"*68 + "╝")
+        print(f"  Narzędzie: {func_name}")
+        print(f"  Argumenty: {func_args}")
+
+        result = calculate(**func_args)
+
+        print(f"\\n╔" + "═"*68 + "╗")
+        print("║  KROK 3: Wywołujemy funkcję i odsyłamy wynik do LLM-a         ║")
+        print("╚" + "═"*68 + "╝")
+        print(f"  Wynik: {result}")
+
+        messages.append(msg)
+        messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+
+        final = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.1)
+
+        print(f"\\n╔" + "═"*68 + "╗")
+        print("║  KROK 4: LLM formułuje ostateczną odpowiedź                   ║")
+        print("╚" + "═"*68 + "╝")
+        print(f"  {final.choices[0].message.content}")
+    else:
+        print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
+else:
+    print("LLM niedostępny — uruchom LM Studio lub Ollamę.")\
+"""))
+
+cells.append(md("""\
+<div style="background:#d4edda; border-left:4px solid #28a745; padding:14px; border-radius:4px;">
+
+**To jest cały cykl Function Calling!**
+
+```
+Użytkownik: "Ile to jest 17 razy 23?"
+    ↓
+LLM myśli: "Potrzebuję calculate(expression='17 * 23')"     ← LLM generuje argumenty
+    ↓
+Nasz kod: calculate("17 * 23") → {"result": 391.0}          ← Python liczy
+    ↓
+LLM: "17 razy 23 to 391"                                     ← LLM formułuje odpowiedź
+```
+
+Kluczowe: **LLM nie liczy sam** — prosi NASZ kod o obliczenie. My kontrolujemy narzędzia.
+
+</div>
+
+Teraz dodamy więcej narzędzi — pogodę i bazę prezydentów."""))
+
+# === 3b: INSTRUCTOR DEMO ===
+
+cells.append(md("""\
+### 3b. Instructor — LLM odpowiada w formacie Pydantic!
+
+Pydantic definiuje **schemat** danych. Ale jak zmusić LLM-a, żeby odpowiedział
+*dokładnie* w tym schemacie?
+
+Biblioteka **`instructor`** opakowuje klienta OpenAI i dodaje parametr `response_model=`.
+Zamiast zwykłego tekstu — dostajemy **obiekt Pydantic** z walidowanymi polami.
+
+```
+Bez instructor:   LLM → "Kraków to miasto w Małopolsce, ma ok. 800 tys. mieszkańców..."  (tekst)
+Z instructor:     LLM → CityInfo(name="Kraków", population=800000, region="Małopolska")   (obiekt!)
+```
+
+To jest nasz `instructor_client` — stworzyliśmy go w sekcji 2.
+Zamiast `client.chat.completions.create(...)` piszemy `instructor_client.chat.completions.create(response_model=...)`.
+
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
+<b>Instructor pod maską:</b>
+<ol>
+<li>Bierze Twój model Pydantic → generuje JSON Schema</li>
+<li>Wysyła schema + prompt do LLM-a: "Odpowiedz w tym formacie JSON"</li>
+<li>Parsuje odpowiedź LLM-a przez Pydantic</li>
+<li>Jeśli walidacja się nie powiedzie → wysyła LLM-owi feedback i prosi o poprawę (do 3 prób!)</li>
+</ol>
+</div>"""))
+
+cells.append(code("""\
+# Prosty model — informacja o mieście
+class CityInfo(BaseModel):
+    name: str = Field(..., description="Nazwa miasta")
+    country: str = Field(..., description="Kraj")
+    population_approx: int = Field(..., description="Przybliżona liczba mieszkańców")
+    famous_for: str = Field(..., description="Z czego miasto jest znane (1 zdanie)")
+
+# instructor w akcji — LLM MUSI odpowiedzieć jako CityInfo!
+if instructor_client:
+    city = instructor_client.chat.completions.create(
+        model=MODEL_NAME,
+        response_model=CityInfo,
+        messages=[{"role": "user", "content": "Opowiedz o Krakowie"}],
+    )
+    # Dostajemy OBIEKT Pythona, nie tekst!
+    print(f"Typ wyniku: {type(city).__name__}")
+    print(f"\\nObiekt:  {city}")
+    print(f"\\nPola:")
+    print(f"  city.name            = {city.name}")
+    print(f"  city.country         = {city.country}")
+    print(f"  city.population_approx = {city.population_approx}")
+    print(f"  city.famous_for      = {city.famous_for}")
+    print(f"\\nJSON:\\n{city.model_dump_json(indent=2)}")
+else:
+    print("instructor_client niedostępny — uruchom LLM-a i wróć do sekcji 2.")\
+"""))
+
+cells.append(md("""\
+### Function Calling vs. Structured Output — dwa różne mechanizmy!
+
+To jest **kluczowe** rozróżnienie w tym notebooku. Mamy dwa klienty i każdy robi co innego:
+
+<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:14px; border-radius:4px;">
+
+| | **Function Calling** (`client`) | **Structured Output** (`instructor_client`) |
+|---|---|---|
+| **Co robi LLM** | **Wybiera** którą funkcję Pythona wywołać | **Wypełnia** schemat Pydantic danymi |
+| **Kto wykonuje pracę** | Nasz kod Pythona (np. łączy się z API pogody) | Sam LLM (generuje dane "z głowy") |
+| **Parametr** | `tools=tools_definition` | `response_model=MyModel` |
+| **Wynik** | LLM woła funkcję → wynik → LLM formułuje tekst | Obiekt Pydantic (np. `CityInfo(...)`) |
+| **Przykład** | "Chcę wywołać `calculate(expression='17*23')`" | `CityInfo(name="Kraków", population=800000)` |
+
+**Analogia kuchenna:**
+- **Function Calling** = LLM jest **kelnerem** — przyjmuje zamówienie i mówi kucharzowi (naszemu kodowi) co ugotować
+- **Structured Output** = LLM jest **formularzem** — musi wypełnić każde pole, nie może pominąć
+
+</div>
+
+Oba mechanizmy używają Pydantic (do definicji schematów), ale w **zupełnie inny sposób**.
+W dalszej części notebooka zobaczymy jak je **łączyć** — Function Calling zbiera dane,
+a Structured Output formatuje końcową odpowiedź."""))
+
+# ══════════════════════════════════════════════════════════════════════
+# SEKCJA 4: POGODA — ZAAWANSOWANY PYDANTIC
+# ══════════════════════════════════════════════════════════════════════
+
+cells.append(md("""\
+## 4. Pogoda — prawdziwe API + zaawansowany Pydantic
+
+Kalkulator pokazał nam cały cykl FC. Teraz zbudujemy **poważniejsze narzędzie**
+— pobierające prawdziwą pogodę z API [wttr.in](https://wttr.in).
+
+Po drodze poznamy zaawansowane możliwości Pydantic:
+- **Walidacja** — `ge=0, le=100` (wilgotność nie może być 150%!)
+- **Kompozycja modeli** — `MaybeWeather` opakowuje `WeatherReport` (model w modelu)"""))
+
+cells.append(code("""\
+# Model Pydantic z walidacją — 4 pola, bardziej złożony niż MathResult
 
 class WeatherReport(BaseModel):
     city: str = Field(..., description="Nazwa miasta")
@@ -165,61 +406,29 @@ class WeatherReport(BaseModel):
     humidity_percent: int = Field(..., ge=0, le=100, description="Wilgotność w procentach")
 
 # Tworzymy instancję:
-report = WeatherReport(
-    city="Kraków",
-    temperature_celsius=18.5,
-    conditions="słonecznie",
-    humidity_percent=45
-)
-
-print("Obiekt Pydantic:")
-print(report)
-print(f"\\nDostęp do pól: {report.city}, {report.temperature_celsius}°C")
-
-# Serializacja do JSON:
-print(f"\\nJSON:\\n{report.model_dump_json(indent=2)}")
+report = WeatherReport(city="Kraków", temperature_celsius=18.5, conditions="słonecznie", humidity_percent=45)
+print(f"Obiekt: {report}")
+print(f"JSON:   {report.model_dump_json()}")
 
 # Walidacja — co się stanie z wilgotnością 150%?
 print("\\nWalidacja — wilgotność 150%:")
 try:
     WeatherReport(city="X", temperature_celsius=0, conditions="x", humidity_percent=150)
 except Exception as e:
-    print(f"  Błąd! {e}")\
+    print(f"  Pydantic odrzucił! {type(e).__name__}")\
 """))
-
-cells.append(code("""\
-# Kluczowa supermoc: Pydantic generuje JSON Schema automatycznie!
-# To jest DOKŁADNIE ten format, którego LLM-y używają do opisu narzędzi.
-
-schema = WeatherReport.model_json_schema()
-print("=== JSON Schema wygenerowany przez Pydantic ===")
-print(json.dumps(schema, indent=2, ensure_ascii=False))
-
-print("\\n→ Za chwilę zobaczymy jak to wygląda w praktyce z LLM-em.")\
-"""))
-
-# ══════════════════════════════════════════════════════════════════════
-# SEKCJA 4: NARZĘDZIA Z PYDANTIC
-# ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 4. Definiujemy narzędzia (z Pydantic!)
-
-Teraz zdefiniujemy funkcje Pythona, które LLM będzie mógł wywoływać.
-Każde narzędzie zwraca dane w formacie JSON — dzięki Pydantic!
-
-### 4a. Pogoda (prawdziwe dane z wttr.in)
+### Kompozycja modeli — `MaybeWeather` (model w modelu)
 
 Narzędzie próbuje pobrać **prawdziwą pogodę** z darmowego API [wttr.in](https://wttr.in).
-Jeśli API jest niedostępne (brak internetu, timeout) — automatycznie przełącza się
-na **dane zastępcze** (mock).
+Jeśli API jest niedostępne — automatycznie przełącza się na **dane zastępcze** (mock).
 
-Zwróć uwagę na wzorzec **`MaybeWeather`** — model Pydantic który *opakowuje* `WeatherReport`
-i dodaje metadane: czy dane są prawdziwe (`success`) i skąd pochodzą (`source`).
+Wzorzec **`MaybeWeather`** *opakowuje* `WeatherReport` i dodaje metadane:
+czy dane są prawdziwe (`success`) i skąd pochodzą (`source`).
 Dzięki temu LLM **strukturalnie wie** czy pogoda jest aktualna czy mockowana
 — zamiast parsować tekst `"(uwaga: dane zastępcze...)"`.
-
-To jest **kompozycja modeli** — model w modelu — częsty wzorzec w produkcyjnych systemach."""))
+"""))
 
 cells.append(code("""\
 class MaybeWeather(BaseModel):
@@ -278,40 +487,19 @@ def get_weather(city: str) -> str:
     return json.dumps({"error": f"Brak danych pogodowych dla: {city}"}, ensure_ascii=False)
 
 
-# Szybki test:
+# Test:
 print("Test pogody:")
 print(get_weather("Kraków"))\
 """))
 
-cells.append(md("### 4b. Kalkulator"))
+# ══════════════════════════════════════════════════════════════════════
+# SEKCJA 5: PREZYDENCI
+# ══════════════════════════════════════════════════════════════════════
 
-cells.append(code("""\
-class MathResult(BaseModel):
-    expression: str = Field(..., description="Wyrażenie matematyczne wejściowe")
-    result: float = Field(..., description="Wynik obliczenia")
+cells.append(md("""\
+## 5. Baza prezydentów Polski
 
-
-def calculate(expression: str) -> str:
-    \"\"\"
-    Wykonuje obliczenie matematyczne.
-
-    Args:
-        expression: Wyrażenie matematyczne, np. '2 + 2', 'sqrt(144)', '15 * 7'
-    \"\"\"
-    try:
-        allowed = {"sqrt": math.sqrt, "sin": math.sin, "cos": math.cos,
-                   "pi": math.pi, "abs": abs, "round": round, "pow": pow}
-        result = eval(expression, {"__builtins__": {}}, allowed)
-        return MathResult(expression=expression, result=float(result)).model_dump_json(indent=2)
-    except Exception as e:
-        return json.dumps({"error": f"Błąd w obliczeniu '{expression}': {e}"}, ensure_ascii=False)
-
-
-print("Test kalkulatora:")
-print(calculate("sqrt(144) + 7 * 3"))\
-"""))
-
-cells.append(md("### 4c. Baza prezydentów Polski"))
+Trzecie narzędzie — baza danych o prezydentach III RP wczytywana z pliku `prezydenci_polski.md`."""))
 
 cells.append(code("""\
 def load_presidents():
@@ -377,23 +565,117 @@ AVAILABLE_TOOLS = {
 }
 
 print(f"Załadowano {len(PREZYDENCI)} prezydentów z pliku .md")
-print(f"Zdefiniowano {len(AVAILABLE_TOOLS)} narzędzia:")
-for name, func in AVAILABLE_TOOLS.items():
-    print(f"  {name}(): {func.__doc__.strip().split(chr(10))[0]}")\
+print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzia: {list(AVAILABLE_TOOLS.keys())}")\
+"""))
+
+cells.append(md("""\
+### 5b. Upgrade — "smart search" z LLM-em (context stuffing)
+
+Nasza funkcja `search_presidents` to prosty **substring search**:
+```python
+if query_lower in all_text:  # "Nobel" ≠ "Nobla" → nie znajdzie!
+```
+
+Problemy:
+- `"Nobel"` → nie znajdzie (w tekście jest *"Nobla"*)
+- `"kto zbierał monety"` → nie znajdzie (szuka całej frazy jako podciągu)
+- `"najdłużej rządził"` → nie znajdzie (w tekście jest *"najdłuższa kadencja"*)
+
+**Rozwiązanie:** wyślijmy **cały tekst** do LLM-a i pozwólmy mu odpowiedzieć **semantycznie**.
+Plik ma ~80 linii (~2000 tokenów) — mieści się w kontekście nawet najsłabszego modelu.
+
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
+
+**To się nazywa context stuffing** — wrzucamy cały dokument do kontekstu LLM-a zamiast
+wyszukiwać fragmenty. Działa świetnie gdy dane się mieszczą.
+
+Gdyby prezydentów było 500 a nie 7 — potrzebowalibyśmy **RAG-a z embeddingami**
+(patrz notebook o embeddingach). Ale przy małych danych — context stuffing wystarczy!
+
+</div>"""))
+
+cells.append(code("""\
+class PresidentAnswer(BaseModel):
+    answer: str = Field(..., description="Odpowiedź na pytanie, oparta o podane dane")
+    presidents_mentioned: List[str] = Field(..., description="Lista prezydentów wspomnianych w odpowiedzi")
+    confidence: float = Field(..., ge=0, le=1, description="Pewność odpowiedzi (0=zgaduję, 1=pewny)")
+
+_PRESIDENTS_RAW = Path("prezydenci_polski.md").read_text(encoding="utf-8") if Path("prezydenci_polski.md").exists() else ""
+
+
+def search_presidents_smart(query: str) -> str:
+    \"\"\"
+    Przeszukuje bazę danych o prezydentach Polski (III RP) — z rozumieniem semantycznym.
+    Rozumie synonimy, kontekst i pytania zadane własnymi słowami.
+
+    Args:
+        query: Pytanie o prezydentów, np. 'kto rządził najdłużej', 'czyje hobby to monety'
+    \"\"\"
+    if not _PRESIDENTS_RAW:
+        return "Brak danych — nie znaleziono pliku prezydenci_polski.md"
+    if not instructor_client:
+        return search_presidents(query)
+    try:
+        result = instructor_client.chat.completions.create(
+            model=MODEL_NAME,
+            response_model=PresidentAnswer,
+            messages=[
+                {"role": "system", "content":
+                 "Odpowiadasz WYŁĄCZNIE na podstawie podanych danych o prezydentach. "
+                 "Jeśli danych brak — powiedz szczerze. Nie wymyślaj. Odpowiadaj po polsku."},
+                {"role": "user", "content":
+                 f"Pytanie: {query}\\n\\nDane:\\n{_PRESIDENTS_RAW}"}
+            ],
+        )
+        return result.model_dump_json(indent=2)
+    except Exception:
+        return search_presidents(query)
+
+
+AVAILABLE_TOOLS["search_presidents"] = search_presidents_smart
+print("Upgrade! search_presidents → wersja smart (context stuffing)")\
+"""))
+
+cells.append(code("""\
+# Porównanie: prosty substring vs. smart LLM
+test_queries = [
+    "Nobel",                     # substring "Nobel" ≠ "Nobla"
+    "kto zbierał monety",        # semantyczne — nie ma takiej frazy w tekście
+    "najdłużej rządził",         # synonim "najdłuższa kadencja"
+    "Kwaśniewski",               # to oba znajdą
+]
+
+print("=== PROSTY (substring) vs. SMART (LLM) ===\\n")
+for q in test_queries:
+    simple = search_presidents(q)
+    simple_ok = "Nie znaleziono" not in simple
+
+    print(f"  Zapytanie: \\"{q}\\"")
+    print(f"    Prosty:  {'ZNALAZŁ' if simple_ok else 'NIE ZNALAZŁ'}")
+
+    if instructor_client:
+        smart = search_presidents_smart(q)
+        smart_ok = "Brak danych" not in smart and "error" not in smart.lower()
+        print(f"    Smart:   {'ZNALAZŁ' if smart_ok else 'NIE ZNALAZŁ'}")
+        if smart_ok:
+            import json as _j
+            try:
+                parsed = _j.loads(smart)
+                print(f"             → {parsed.get('answer', '')[:100]}...")
+            except Exception:
+                print(f"             → {smart[:100]}...")
+    print()\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 5: JSON SCHEMA — CO WIDZI LLM
+# SEKCJA 6: JSON SCHEMA + WSZYSTKIE NARZĘDZIA + LLM WYBIERA
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 5. JSON Schema — co widzi LLM
+## 6. Trzy narzędzia — LLM wybiera!
 
-LLM nie widzi naszego kodu Pythona. Musimy mu **opisać** każde narzędzie
-w formacie JSON Schema — standardzie którego używają OpenAI, Anthropic, Ollama.
-
-Na razie napiszemy te opisy **ręcznie** — za chwilę zobaczymy jak Pydantic
-robi to **automatycznie**."""))
+Mamy kalkulator, pogodę i prezydentów. Teraz złóżmy je razem — opiszemy
+wszystkie trzy w JSON Schema i zobaczmy jak LLM **sam wybiera** odpowiednie narzędzie."""))
 
 cells.append(code("""\
 tools_definition = [
@@ -435,13 +717,13 @@ tools_definition = [
         "type": "function",
         "function": {
             "name": "search_presidents",
-            "description": "Przeszukuje bazę danych o prezydentach Polski (III RP). Zawiera kadencje, partie, wykształcenie, kluczowe wydarzenia i mało znane fakty. Użyj gdy pytanie dotyczy prezydentów RP.",
+            "description": "Przeszukuje bazę danych o prezydentach Polski (III RP) — rozumie pytania semantycznie. Zawiera kadencje, partie, wykształcenie, kluczowe wydarzenia i mało znane fakty. Użyj gdy pytanie dotyczy prezydentów RP.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Zapytanie do bazy, np. 'Kwaśniewski', 'katastrofa', 'najmłodszy'"
+                        "description": "Pytanie o prezydentów, np. 'kto rządził najdłużej', 'mało znane fakty', 'Kwaśniewski'"
                     }
                 },
                 "required": ["query"]
@@ -450,111 +732,10 @@ tools_definition = [
     }
 ]
 
-print("=== TO WIDZI LLM (definicje narzędzi) ===")
-print(json.dumps(tools_definition[0], indent=2, ensure_ascii=False))
-print("\\n... i jeszcze 2 kolejne narzędzia.")\
+print("LLM ma teraz 3 narzędzia do wyboru:")
+for t in tools_definition:
+    print(f"  {t['function']['name']}: {t['function']['description'][:60]}...")\
 """))
-
-cells.append(md("""\
-### Pydantic generuje to samo — automatycznie!
-
-Pamiętasz `WeatherReport.model_json_schema()`? Porównajmy z tym co napisaliśmy ręcznie.
-W przyszłości — zamiast pisać JSON Schema ręcznie — użyjemy Pydantic."""))
-
-cells.append(code("""\
-# Pydantic model dla PARAMETRÓW narzędzia (input):
-class WeatherInput(BaseModel):
-    city: str = Field(..., description="Nazwa miasta, np. 'Kraków', 'Warszawa'")
-
-auto_schema = WeatherInput.model_json_schema()
-
-# Porównanie: ręczny vs. automatyczny
-print("=== RĘCZNY (pisany przez nas) ===")
-print(json.dumps(tools_definition[0]["function"]["parameters"], indent=2, ensure_ascii=False))
-print()
-print("=== AUTOMATYCZNY (Pydantic) ===")
-print(json.dumps(auto_schema, indent=2, ensure_ascii=False))
-print()
-print("→ Pydantic dodaje 'title' — LLM-y to ignorują.")
-print("  Ale 'properties' i 'required' są IDENTYCZNE!")\
-"""))
-
-# ══════════════════════════════════════════════════════════════════════
-# SEKCJA 6: PIERWSZY FC — POD MASKĄ
-# ══════════════════════════════════════════════════════════════════════
-
-cells.append(md("""\
-## 6. Pierwszy function call — krok po kroku, pod maską!
-
-Teraz wyślemy pytanie do LLM-a razem z opisem narzędzi.
-LLM **sam zdecyduje** czy potrzebuje narzędzia i którego.
-
-Zobaczmy **dokładnie** co się dzieje na każdym etapie."""))
-
-cells.append(code("""\
-user_question = "Jaka jest pogoda w Krakowie?"
-
-if OLLAMA_URL:
-    print("╔" + "═"*68 + "╗")
-    print("║  KROK 1: Wysyłamy pytanie + opisy narzędzi do LLM-a            ║")
-    print("╚" + "═"*68 + "╝")
-    print(f"\\n  Pytanie użytkownika: \\"{user_question}\\"")
-    print(f"  Dostępne narzędzia: {[t['function']['name'] for t in tools_definition]}")
-    print(f"  → Wysyłam do {MODEL_NAME}...\\n")
-
-    messages = [
-        {"role": "system", "content": "Jesteś pomocnym asystentem. Odpowiadaj po polsku. Używaj narzędzi gdy to potrzebne."},
-        {"role": "user", "content": user_question}
-    ]
-
-    response = client.chat.completions.create(
-        model=MODEL_NAME, messages=messages, tools=tools_definition, temperature=0.1
-    )
-
-    msg = response.choices[0].message
-
-    if msg.tool_calls:
-        tc = msg.tool_calls[0]
-        func_name = tc.function.name
-        func_args = json.loads(tc.function.arguments)
-
-        print("╔" + "═"*68 + "╗")
-        print("║  KROK 2: LLM wybrał narzędzie!                                ║")
-        print("╚" + "═"*68 + "╝")
-        print(f"  Narzędzie: {func_name}")
-        print(f"  Argumenty: {func_args}")
-
-        result = AVAILABLE_TOOLS[func_name](**func_args)
-
-        print(f"\\n╔" + "═"*68 + "╗")
-        print("║  KROK 3: Wywołujemy funkcję i odsyłamy wynik do LLM-a         ║")
-        print("╚" + "═"*68 + "╝")
-        print(f"  Wynik funkcji: {result[:200]}")
-
-        messages.append(msg)
-        messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
-
-        final = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.1)
-
-        print(f"\\n╔" + "═"*68 + "╗")
-        print("║  KROK 4: LLM formułuje ostateczną odpowiedź                   ║")
-        print("╚" + "═"*68 + "╝")
-        print(f"  {final.choices[0].message.content}")
-    else:
-        print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
-else:
-    print("LLM niedostępny — uruchom LM Studio lub Ollamę.")\
-"""))
-
-# ══════════════════════════════════════════════════════════════════════
-# SEKCJA 7: LLM SAM WYBIERA
-# ══════════════════════════════════════════════════════════════════════
-
-cells.append(md("""\
-## 7. LLM sam wybiera narzędzie!
-
-Zobaczmy jak LLM reaguje na **różne** pytania —
-automatycznie wybiera odpowiednie narzędzie (lub żadne!)."""))
 
 cells.append(code("""\
 def ask_with_tools(question, verbose=True):
@@ -777,11 +958,11 @@ tools_definition.append({
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 8: WIKIPEDIA
+# SEKCJA 7: WIKIPEDIA
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 8. Wikipedia jako narzędzie
+## 7. Wikipedia jako narzędzie
 
 Pora na **prawdziwe** narzędzie sięgające do internetu!
 Biblioteka `wikipedia` pozwala przeszukiwać Wikipedię programatycznie."""))
@@ -890,11 +1071,11 @@ tools_definition.append({
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 9: WEB SEARCH — DUCKDUCKGO
+# SEKCJA 8: WEB SEARCH — DUCKDUCKGO
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 9. Web search — DuckDuckGo
+## 8. Web search — DuckDuckGo
 
 Wikipedia jest świetna dla encyklopedycznej wiedzy. Ale co z **aktualnymi wydarzeniami**?
 
@@ -963,21 +1144,14 @@ print(result[:300] + "..." if len(result) > 300 else result)\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 10: INSTRUCTOR — STRUCTURED OUTPUT
+# SEKCJA 9: INSTRUCTOR — STRUCTURED OUTPUT
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 10. Structured Output — LLM odpowiada strukturalnie
+## 9. Structured Output — zaawansowane użycie
 
-Do tej pory LLM zwracał **zwykły tekst** jako odpowiedź. Ale w produkcyjnych systemach
-potrzebujemy **ustrukturyzowanej odpowiedzi** — z polami, źródłami, pewnością.
-
-Biblioteka `instructor` pozwala **zmusić** LLM-a do odpowiadania w ścisłym formacie Pydantic.
-Zamiast tekstu dostajemy **obiekt Pythona** z walidowanymi polami.
-
-To jest ta sama technika, którą używają profesjonalne systemy AI:
-- Zamiast *"Kraków ma 800 tysięcy mieszkańców"*
-- Dostajemy `PopulationInfo(city="Kraków", population=800000, rank_in_poland=2)`
+W sekcji 3b poznaliśmy `instructor` — LLM odpowiada jako obiekt Pydantic zamiast tekstu.
+Teraz użyjemy go do czegoś poważniejszego: **LLM który uzasadnia swoje decyzje strukturalnie**.
 
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:14px; border-radius:4px;">
 
@@ -990,30 +1164,36 @@ To jest ta sama technika, którą używają profesjonalne systemy AI:
 | **Retry** | Nie — nie wie że rozmawia z LLM-em | Tak — domyślnie do 3 prób |
 
 Czyli: **Pydantic mówi "źle!"**, a **instructor łapie ten błąd i każe LLM-owi poprawić**.
+</div>
 
-Bez `instructor`, z gołym Pydantic — słaby model który pominie pole → `ValidationError` i koniec.
-Z `instructor` — model dostanie feedback i spróbuje jeszcze raz.
+### Gdzie Structured Output + Function Calling współpracują?
+
+Pomyślmy o łańcuchu function calli (pętla agentowa):
 
 ```
-instructor pod maską:
-1. Wyślij prompt + JSON Schema (z Pydantic) do LLM-a
-2. Dostań odpowiedź
-3. Sparsuj przez Pydantic → OK? → zwróć obiekt
-4. ValidationError? → wyślij LLM-owi:
-   "Twoja odpowiedź nie przeszła walidacji:
-    'humidity_percent is required'. Popraw."
-5. Wróć do 2. (max 3 próby)
+Pytanie: "Sprawdź pogodę w Krakowie i oblicz ile to w Fahrenheitach"
+
+Krok 1: LLM → tool_call: get_weather(city="Kraków")       ← argumenty są JUŻ strukturalne (protokół tools)
+        → wynik: {"temp": 18, ...}                          ← MY strukturujemy Pydanticem (model_dump_json)
+Krok 2: LLM → tool_call: calculate(expression="18*9/5+32") ← argumenty znowu strukturalne (tools)
+        → wynik: {"result": 64.4}
+Krok 3: LLM → ODPOWIEDŹ: "W Krakowie jest 18°C czyli 64°F" ← to jest ZWYKŁY TEKST!
 ```
 
+Widzisz? W łańcuchu wejścia do narzędzi są strukturalne (protokół `tools=`), wyjścia z narzędzi
+strukturujemy Pydanticem. Ale **końcowa odpowiedź** LLM-a to wolny tekst — i właśnie tu wchodzi instructor!
+
+<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:12px; border-radius:4px;">
+
+**Combo pattern (użyjemy go w ćwiczeniu 4):**
+1. **Function Calling** (`client` + `tools=`) → zbieramy dane z narzędzi
+2. **Structured Output** (`instructor_client` + `response_model=`) → formatujemy końcowy werdykt
+
+Dzięki temu końcowa odpowiedź to nie tekst do parsowania, ale obiekt z polami: `verdict`, `confidence`, `source`.
 </div>"""))
 
 cells.append(code("""\
-import instructor
-
-instructor_client = instructor.from_openai(
-    OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="lm-studio" if "1234" in OLLAMA_URL else "ollama"),
-    mode=instructor.Mode.JSON
-) if OLLAMA_URL else None
+# instructor_client mamy od sekcji 2 — teraz go użyjemy do czegoś nowego
 
 class ToolReasoning(BaseModel):
     thinking: str = Field(..., description="Krótkie uzasadnienie — dlaczego wybrałeś to narzędzie (1-2 zdania)")
@@ -1163,11 +1343,11 @@ def verify_claim(claim: str) -> FactCheck:
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 11: PĘTLA AGENTOWA
+# SEKCJA 10: PĘTLA AGENTOWA
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 11. Pętla agentowa — LLM który myśli i działa
+## 10. Pętla agentowa — LLM który myśli i działa
 
 Do tej pory obsługiwaliśmy **jedno** wywołanie narzędzia.
 Ale co jeśli LLM potrzebuje **kilku** narzędzi po kolei?
@@ -1406,19 +1586,152 @@ Dla asystenta podróżniczego: `SYSTEM_PROMPT = "Jesteś asystentem podróżnicz
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA 12: PODSUMOWANIE
+# SEKCJA BONUS: FC + SO PIPELINE
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 12. Podsumowanie
+## Bonus: FC + Structured Output w pipeline
+
+Zobaczmy jeszcze jeden wzorzec — **łączenie Function Calling ze Structured Output w jednym narzędziu**.
+
+Do tej pory nasze narzędzia same tworzyły obiekty Pydantic z danych (np. `get_weather` tworzy
+`MaybeWeather` z odpowiedzi API). Ale co jeśli narzędzie zwraca **surowy tekst**,
+z którego chcemy wyciągnąć strukturę?
+
+Np. Wikipedia zwraca akapit tekstu o Krakowie — a my chcemy obiekt `CityInfo(name=..., population=..., famous_for=...)`.
+
+**Nasz kod Pythona** tego nie potrafi (parsowanie języka naturalnego). Ale **LLM potrafi**!
+I tu `instructor` jest idealny — bo jeśli LLM nie wypełni wszystkich pól,
+instructor złapie `ValidationError` i każe mu spróbować ponownie (do 3 prób).
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. Function Calling     │  2. Structured Output            │
+│  (client + tools=)       │  (instructor + response_model=)  │
+│                          │                                   │
+│  LLM: "wywołaj           │  LLM: "wyciągnij z tego tekstu   │
+│   search_wikipedia(       │   pola: name, population,        │
+│   query='Kraków')"        │   famous_for"                    │
+│         ↓                │         ↓                         │
+│  Nasz kod → Wikipedia    │  instructor → obiekt Pydantic     │
+│         ↓                │  (z retry jeśli brakuje pól!)     │
+│  Surowy tekst            │                                   │
+└─────────────────────────────────────────────────────────────┘
+```"""))
+
+cells.append(code("""\
+# Model: ustrukturyzowane info o mieście
+class CityProfile(BaseModel):
+    name: str = Field(..., description="Nazwa miasta")
+    country: str = Field(..., description="Kraj")
+    population_approx: Optional[int] = Field(None, description="Przybliżona liczba mieszkańców (jeśli podana)")
+    famous_for: str = Field(..., description="Z czego miasto jest znane (1-2 zdania)")
+    fun_fact: Optional[str] = Field(None, description="Ciekawostka (jeśli znaleziona w tekście)")
+
+
+def smart_city_lookup(city_name: str) -> str:
+    \"\"\"
+    Pipeline: Wikipedia (surowy tekst) → LLM + instructor (strukturalny obiekt).
+
+    Krok 1: Function Calling — pobieramy artykuł z Wikipedii
+    Krok 2: Structured Output — LLM parsuje tekst → CityProfile
+    \"\"\"
+    # KROK 1: Pobierz surowy tekst z Wikipedii
+    try:
+        raw_text = search_wikipedia(city_name)
+    except Exception:
+        raw_text = f"Brak danych o mieście {city_name}"
+
+    print(f"  [Pipeline krok 1] Wikipedia zwróciła {len(raw_text)} znaków surowego tekstu")
+    print(f"  Fragment: \\"{raw_text[:120]}...\\"")
+
+    # KROK 2: LLM parsuje tekst → obiekt Pydantic (z retry!)
+    if not instructor_client:
+        return raw_text  # fallback: zwróć surowy tekst
+
+    try:
+        profile = instructor_client.chat.completions.create(
+            model=MODEL_NAME,
+            response_model=CityProfile,
+            messages=[
+                {"role": "system", "content":
+                 "Wyciągnij informacje o mieście z podanego tekstu. "
+                 "Użyj TYLKO informacji z tekstu — nie wymyślaj."},
+                {"role": "user", "content": f"Tekst źródłowy:\\n{raw_text}"}
+            ],
+        )
+        print(f"  [Pipeline krok 2] Instructor → CityProfile (z retry jeśli trzeba)")
+        return profile.model_dump_json(indent=2)
+    except Exception as e:
+        return f"Błąd parsowania: {e}\\n\\nSurowy tekst: {raw_text[:300]}"
+
+
+# Test pipeline
+if instructor_client:
+    print("=== Pipeline: Wikipedia → LLM → CityProfile ===\\n")
+    result = smart_city_lookup("Kraków")
+    print(f"\\n  Wynik (ustrukturyzowany):\\n{result}")
+else:
+    print("instructor_client niedostępny — uruchom LLM-a i wróć do sekcji 2.")\
+"""))
+
+cells.append(code("""\
+# Porównanie: surowy tekst z Wikipedii vs. ustrukturyzowany obiekt
+if instructor_client:
+    cities = ["Gdańsk", "Wrocław"]
+
+    for city_name in cities:
+        print(f"\\n{'═'*60}")
+        print(f"MIASTO: {city_name}")
+        print(f"{'═'*60}")
+        result_json = smart_city_lookup(city_name)
+
+        try:
+            parsed = json.loads(result_json)
+            print(f"\\n  Obiekt CityProfile:")
+            for key, val in parsed.items():
+                print(f"    {key}: {val}")
+        except Exception:
+            print(f"  (surowy wynik: {result_json[:200]})")
+else:
+    print("instructor_client niedostępny.")\
+"""))
+
+cells.append(md("""\
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:14px; border-radius:4px;">
+
+**Co się tu wydarzyło?**
+
+1. **Function Calling** pobrał surowy tekst z Wikipedii (narzędzie `search_wikipedia`)
+2. **Instructor** (Structured Output) wziął ten tekst i wyciągnął z niego ustrukturyzowane pola
+3. Gdyby LLM pominął pole — instructor złapałby `ValidationError` i kazał spróbować ponownie
+
+To jest wzorzec **ETL z LLM-em**: Extract (Wikipedia) → Transform (instructor) → Load (obiekt Pydantic).
+
+W sekcji 5b (`search_presidents_smart`) zrobiliśmy to samo — wczytaliśmy cały plik `.md`
+i pozwoliliśmy LLM-owi odpowiedzieć strukturalnie. To ten sam pattern!
+
+**Kiedy to stosować?**
+- Gdy źródło danych zwraca **nieustrukturyzowany tekst** (Wikipedia, web search, PDF, email...)
+- A Ty potrzebujesz **konkretnych pól** do dalszego przetwarzania
+- I chcesz **gwarancję formatu** (instructor z retry)
+
+</div>"""))
+
+# ══════════════════════════════════════════════════════════════════════
+# SEKCJA 11: PODSUMOWANIE
+# ══════════════════════════════════════════════════════════════════════
+
+cells.append(md("""\
+## 11. Podsumowanie
 
 ### Co zrobiliśmy?
 
-1. **Pydantic** — ustrukturyzowane dane + automatyczne JSON Schema + walidacja
-2. **Narzędzia** — pogoda (prawdziwe API!), kalkulator, baza prezydentów, Wikipedia, web search
-3. **Pod maską** — co dokładnie LLM widzi, jak wybiera funkcję
-4. **JSON Schema** — ręcznie vs. automatycznie (Pydantic)
-5. **Structured Output** — `instructor` wymusza format odpowiedzi LLM-a
+1. **Pydantic + instructor** — ustrukturyzowane dane, JSON Schema, walidacja + LLM odpowiada jako obiekt Pythona
+2. **Function Calling vs. Structured Output** — dwa różne mechanizmy, dwa klienty, komplementarne role
+3. **Narzędzia** — pogoda (prawdziwe API!), kalkulator, baza prezydentów, Wikipedia, web search
+4. **Pod maską** — co dokładnie LLM widzi, jak wybiera funkcję, JSON Schema ręcznie vs. automatycznie
+5. **Combo pattern** — FC zbiera dane z narzędzi → Structured Output formatuje końcowy werdykt (FactCheck!)
 6. **Pętla agentowa** — LLM sam decyduje które narzędzia wywołać i w jakiej kolejności
 
 ### Tak działają prawdziwe produkty AI
@@ -1440,7 +1753,7 @@ Wszystkie działają na tej samej zasadzie: **LLM + zestaw narzędzi + pętla ag
 
 **2. Pydantic to nie tylko walidacja** — automatycznie generuje JSON Schema, wymusza strukturę odpowiedzi narzędzi
 
-**3. `instructor` zamienia LLM w "wypełniacz formularzy"** — zamiast tekstu dostajesz obiekty z polami
+**3. FC + Structured Output = combo** — FC zbiera dane z prawdziwych źródeł, instructor formatuje końcowy werdykt w obiekt z polami
 
 **4. Agent jest tak dobry jak jego narzędzia** — fikcyjne fakty o prezydentach udowodniły, że LLM wierzy temu co mu podamy
 
