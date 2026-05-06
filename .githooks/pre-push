@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# pre-push hook: block pushes containing commits from unwanted authors/committers.
+# Activate with: git config core.hooksPath .githooks
+
+BLOCKED_EMAILS="kamil.jedryczek@airslate.com"
+BLOCKED_NAMES="claude"
+
+while read local_ref local_sha remote_ref remote_sha; do
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        range="$local_sha"
+    else
+        range="$remote_sha..$local_sha"
+    fi
+
+    for commit in $(git rev-list "$range" 2>/dev/null); do
+        author_name=$(git log -1 --format='%an' "$commit")
+        author_email=$(git log -1 --format='%ae' "$commit")
+        committer_name=$(git log -1 --format='%cn' "$commit")
+        committer_email=$(git log -1 --format='%ce' "$commit")
+
+        for email in $BLOCKED_EMAILS; do
+            if [ "$author_email" = "$email" ] || [ "$committer_email" = "$email" ]; then
+                echo "BLOCKED: commit $commit has email $email"
+                echo "Fix: git commit --amend --author='NXTRSS <kamillo_j@yahoo.com>'"
+                exit 1
+            fi
+        done
+
+        for name in $BLOCKED_NAMES; do
+            a_lower=$(echo "$author_name" | tr '[:upper:]' '[:lower:]')
+            c_lower=$(echo "$committer_name" | tr '[:upper:]' '[:lower:]')
+            if [ "$a_lower" = "$name" ] || [ "$c_lower" = "$name" ]; then
+                echo "BLOCKED: commit $commit has author/committer '$name'"
+                echo "Fix: git commit --amend --author='NXTRSS <kamillo_j@yahoo.com>'"
+                exit 1
+            fi
+        done
+    done
+done

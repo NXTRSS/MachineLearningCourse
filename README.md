@@ -114,6 +114,14 @@ git pull
 uv sync          # tylko Plan A — jeśli zmieniły się zależności
 ```
 
+> **`git pull` zgłasza błędy / konflikty?** Jeśli nie masz własnych zmian, które chcesz zachować:
+> ```bash
+> git fetch origin
+> git reset --hard origin/main
+> uv sync   # tylko Plan A
+> ```
+> To nadpisze lokalną kopię aktualną wersją z GitHub.
+
 **Plan C:** pobierz notebook ponownie z GitHub (File → Open notebook → GitHub).
 
 ---
