@@ -225,9 +225,13 @@ calc_tool = {
 user_question = "Ile to jest 17 razy 23?"
 
 if client:
-    print("╔" + "═"*68 + "╗")
-    print("║  KROK 1: Wysyłamy pytanie + opis narzędzia do LLM-a            ║")
-    print("╚" + "═"*68 + "╝")
+    W = 60
+    def box(text):
+        print("╔" + "═"*W + "╗")
+        print("║  " + text.ljust(W-4) + "  ║")
+        print("╚" + "═"*W + "╝")
+
+    box("KROK 1: Wysyłamy pytanie + opis narzędzia do LLM-a")
     print(f"\\n  Pytanie: \\"{user_question}\\"")
     print(f"  Narzędzie: calculate — {calc_tool['function']['description']}")
     print(f"  → Wysyłam do {MODEL_NAME}...\\n")
@@ -248,17 +252,14 @@ if client:
         func_name = tc.function.name
         func_args = json.loads(tc.function.arguments)
 
-        print("╔" + "═"*68 + "╗")
-        print("║  KROK 2: LLM wybrał narzędzie!                                ║")
-        print("╚" + "═"*68 + "╝")
+        box("KROK 2: LLM wybrał narzędzie!")
         print(f"  Narzędzie: {func_name}")
         print(f"  Argumenty: {func_args}")
 
         result = calculate(**func_args)
 
-        print(f"\\n╔" + "═"*68 + "╗")
-        print("║  KROK 3: Wywołujemy funkcję i odsyłamy wynik do LLM-a         ║")
-        print("╚" + "═"*68 + "╝")
+        print()
+        box("KROK 3: Wywołujemy funkcję i odsyłamy wynik do LLM-a")
         print(f"  Wynik: {result}")
 
         messages.append(msg)
@@ -266,9 +267,8 @@ if client:
 
         final = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.1)
 
-        print(f"\\n╔" + "═"*68 + "╗")
-        print("║  KROK 4: LLM formułuje ostateczną odpowiedź                   ║")
-        print("╚" + "═"*68 + "╝")
+        print()
+        box("KROK 4: LLM formułuje ostateczną odpowiedź")
         print(f"  {final.choices[0].message.content}")
     else:
         print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
