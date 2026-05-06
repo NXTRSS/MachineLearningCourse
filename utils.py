@@ -608,10 +608,14 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
-def connect_llm(lecturer_server="http://192.168.1.100:11434"):
+def connect_llm(lecturer_server="http://192.168.1.100:1234"):
     """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
-    Kolejność prób: LM Studio → auto-launch lms → Ollama → serwer prowadzącego.
+    Kolejność prób:
+      1. LM Studio lokalne (port 1234)
+      2. Auto-launch LM Studio (jeśli `lms` w PATH)
+      3. Ollama lokalna (port 11434)
+      4. Serwer prowadzącego — próbuje LM Studio, potem Ollama
 
     Zwraca:
         client           — do function calling (tools=)
@@ -632,7 +636,7 @@ def connect_llm(lecturer_server="http://192.168.1.100:11434"):
             instr = None
         return client, instr, model
 
-    # 1) LM Studio
+    # 1) LM Studio lokalne
     print("Szukam LM Studio (port 1234)...")
     models = detect_lmstudio()
     if not models:
@@ -650,13 +654,23 @@ def connect_llm(lecturer_server="http://192.168.1.100:11434"):
         print(f"✓ Lokalna Ollama! Model: {model}")
         return _make_clients("http://localhost:11434", "ollama", model)
 
-    # 3) Serwer prowadzącego
+    # 3) Serwer prowadzącego — próbuj LM Studio, potem Ollama
     if lecturer_server:
-        print("  Ollama niedostępna.\nPróbuję serwer prowadzącego...")
+        print(f"  Lokalny LLM niedostępny.\nPróbuję serwer prowadzącego ({lecturer_server})...")
+
+        # 3a) LM Studio na serwerze prowadzącego
+        models = detect_lmstudio(lecturer_server)
+        if models:
+            model = pick_best_model(models) or models[0]
+            print(f"✓ Serwer prowadzącego (LM Studio)! Model: {model}")
+            return _make_clients(lecturer_server, "lm-studio", model)
+
+        # 3b) Ollama na serwerze prowadzącego (inny port?)
+        #     Spróbuj ten sam adres ale z endpointem Ollamy
         models = detect_ollama(lecturer_server)
         if models:
             model = pick_best_model(models)
-            print(f"✓ Serwer prowadzącego! Model: {model}")
+            print(f"✓ Serwer prowadzącego (Ollama)! Model: {model}")
             return _make_clients(lecturer_server, "ollama", model)
 
     print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
