@@ -608,7 +608,7 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
-def connect_llm(instructor_server="http://192.168.1.100:11434"):
+def connect_llm(lecturer_server="http://192.168.1.100:11434"):
     """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
     Kolejność prób: LM Studio → auto-launch lms → Ollama → serwer prowadzącego.
@@ -651,13 +651,13 @@ def connect_llm(instructor_server="http://192.168.1.100:11434"):
         return _make_clients("http://localhost:11434", "ollama", model)
 
     # 3) Serwer prowadzącego
-    if instructor_server:
+    if lecturer_server:
         print("  Ollama niedostępna.\nPróbuję serwer prowadzącego...")
-        models = detect_ollama(instructor_server)
+        models = detect_ollama(lecturer_server)
         if models:
             model = pick_best_model(models)
             print(f"✓ Serwer prowadzącego! Model: {model}")
-            return _make_clients(instructor_server, "ollama", model)
+            return _make_clients(lecturer_server, "ollama", model)
 
     print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
     return None, None, None
