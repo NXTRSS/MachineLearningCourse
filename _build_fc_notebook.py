@@ -113,8 +113,11 @@ Poniższa komórka automatycznie szuka działającego LLM-a. Zanim ją uruchomis
 
 **Upewnij się, że LLM jest uruchomiony!**
 
-- **LM Studio** — otwórz aplikację → załaduj model → upewnij się że serwer jest włączony (zakładka *Local Server*, zielony przycisk *Start Server*)
-- **Ollama** — na macOS zwykle startuje automatycznie. Jeśli nie: otwórz terminal i wpisz `ollama serve`
+- **LM Studio** (macOS / Windows / Linux) — otwórz aplikację → załaduj model → zakładka *Local Server* → zielony przycisk *Start Server*
+- **Ollama** — otwórz terminal i wpisz `ollama serve`
+  - *macOS:* jeśli zainstalowałeś przez `.dmg`, Ollama zwykle startuje automatycznie (ikonka w pasku menu)
+  - *Windows:* Ollama działa jako usługa po instalacji — jeśli nie, uruchom ręcznie z menu Start
+  - *Linux:* `ollama serve` w terminalu (lub `systemctl start ollama` jeśli zainstalowano przez `curl`)
 
 Szczegóły instalacji: patrz `setup_local_llm.ipynb` lub `docs/LOKALNE_LLM.md`
 </div>
