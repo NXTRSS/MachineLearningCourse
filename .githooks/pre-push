@@ -1,10 +1,15 @@
 #!/bin/sh
 #
-# pre-push hook: block pushes containing commits from unwanted authors/committers.
+# pre-push hook: block pushes containing:
+#   1. commits from unwanted authors/committers
+#   2. LECTURER_SERVER with a real IP/port (not the placeholder)
+#
 # Activate with: git config core.hooksPath .githooks
 
 BLOCKED_EMAILS="kamil.jedryczek@airslate.com"
 BLOCKED_NAMES="claude"
+
+# ── CHECK 1: Author / committer ──────────────────────────────────────
 
 while read local_ref local_sha remote_ref remote_sha; do
     if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
@@ -42,3 +47,34 @@ while read local_ref local_sha remote_ref remote_sha; do
         done
     done
 done
+
+# ── CHECK 2: LECTURER_SERVER nie może zawierać prawdziwego adresu ─────
+#
+# Szukamy linii z LECTURER_SERVER = "http://..." gdzie adres NIE jest
+# placeholderem (ADRES_SERWERA). Sprawdzamy pliki które idą do repo.
+
+LEAKED=""
+for file in utils.py _build_fc_notebook.py Function_Calling.ipynb; do
+    if [ -f "$file" ]; then
+        # Szukaj LECTURER_SERVER z prawdziwym IP/adresem (nie placeholderem)
+        match=$(grep -n 'LECTURER_SERVER.*http' "$file" | grep -v 'ADRES_SERWERA' | grep -v '#.*ADRES' | head -1)
+        if [ -n "$match" ]; then
+            LEAKED="$LEAKED\n  $file: $match"
+        fi
+        # Szukaj też lecturer_server= z prawdziwym adresem w domyślnym parametrze
+        match=$(grep -n 'lecturer_server=.*http' "$file" | grep -v 'ADRES_SERWERA' | head -1)
+        if [ -n "$match" ]; then
+            LEAKED="$LEAKED\n  $file: $match"
+        fi
+    fi
+done
+
+if [ -n "$LEAKED" ]; then
+    echo "BLOCKED: LECTURER_SERVER zawiera prawdziwy adres serwera!"
+    echo "Znaleziono w:"
+    echo "$LEAKED"
+    echo ""
+    echo "Fix: zamień na placeholder 'http://ADRES_SERWERA:PORT'"
+    echo "  lub uruchom: python _build_fc_notebook.py  (przebuduje notebook z placeholderem)"
+    exit 1
+fi
