@@ -194,7 +194,7 @@ def _predict_one(model, image, classNames):
 
 
 def _build_title(models_dict, image, classNames):
-    """Buduje tytuł z predykcjami wszystkich modeli."""
+    """Buduje tytuł z predykcjami wszystkich modeli (każdy w nowej linii)."""
     if len(models_dict) == 1:
         model = list(models_dict.values())[0]
         label, prob = _predict_one(model, image, classNames)
@@ -203,7 +203,7 @@ def _build_title(models_dict, image, classNames):
     for name, model in models_dict.items():
         label, prob = _predict_one(model, image, classNames)
         parts.append(f"{name}: {label} ({prob:.0%})")
-    return "  |  ".join(parts)
+    return "\n".join(parts)
 
 
 def predict_image_from_files(models, my_button, classNames):
@@ -381,6 +381,80 @@ def show_tokens(text, label='', model='gpt-4o'):
         f'</div>'
     )
     display(HTML(html))
+
+
+def plot_training_comparison(histories, figsize=None):
+    """Porównanie accuracy i loss wielu modeli obok siebie, ze wspólną osią Y.
+
+    histories: dict {nazwa: history_obiekt_lub_None}
+        Modele z wartością None są pomijane (jeszcze nie wytrenowane).
+        history może być obiektem Keras (history.history) lub dict.
+
+    Przykład użycia w notebooku:
+        plot_training_comparison({
+            'FFNN': globals().get('history_model'),
+            'Dropout': globals().get('history_model_reg'),
+            'CNN': globals().get('history_model_cnn'),
+        })
+    """
+    # Filtruj None i wyciągnij dict z history
+    items = []
+    for name, h in histories.items():
+        if h is None:
+            continue
+        hd = h.history if hasattr(h, 'history') else h
+        items.append((name, hd))
+
+    if not items:
+        print("Brak dostępnych wyników do wyświetlenia.")
+        return
+
+    n = len(items)
+    if figsize is None:
+        figsize = (6 * n, 8)
+
+    fig, axes = plt.subplots(nrows=2, ncols=n, figsize=figsize, squeeze=False)
+
+    # Wspólne zakresy osi Y
+    all_acc = [v for _, hd in items for v in hd['accuracy'] + hd['val_accuracy']]
+    all_loss = [v for _, hd in items for v in hd['loss'] + hd['val_loss']]
+    acc_min = max(0, min(all_acc) - 0.05)
+    acc_max = min(1, max(all_acc) + 0.05)
+    loss_max = max(all_loss) * 1.05
+
+    colors = {'train': '#1f77b4', 'val': '#ff7f0e'}
+
+    for col, (name, hd) in enumerate(items):
+        # Accuracy
+        ax = axes[0][col]
+        ax.plot(hd['accuracy'], color=colors['train'], label='train')
+        ax.plot(hd['val_accuracy'], color=colors['val'], label='val')
+        best_val = max(hd['val_accuracy'])
+        best_ep = hd['val_accuracy'].index(best_val)
+        ax.axhline(y=best_val, color=colors['val'], linestyle=':', alpha=0.4)
+        ax.plot(best_ep, best_val, 'o', color=colors['val'], markersize=6)
+        ax.set_title(f'{name}\nbest val: {best_val:.3f} (ep {best_ep+1})', fontsize=11)
+        ax.set_xlabel('epoch')
+        ax.set_ylim(acc_min, acc_max)
+        if col == 0:
+            ax.set_ylabel('accuracy')
+        ax.legend(loc='lower right', fontsize=9)
+        ax.grid(alpha=0.3)
+
+        # Loss
+        ax = axes[1][col]
+        ax.plot(hd['loss'], color=colors['train'], label='train')
+        ax.plot(hd['val_loss'], color=colors['val'], label='val')
+        ax.set_title(f'{name} — loss', fontsize=11)
+        ax.set_xlabel('epoch')
+        ax.set_ylim(0, loss_max)
+        if col == 0:
+            ax.set_ylabel('loss')
+        ax.legend(loc='upper right', fontsize=9)
+        ax.grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
 
 
 class bcolors:
