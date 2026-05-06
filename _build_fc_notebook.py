@@ -133,11 +133,9 @@ INSTRUCTOR_SERVER = "http://192.168.1.100:11434"
 
 client, MODEL_NAME, OLLAMA_URL = connect_llm(instructor_server=INSTRUCTOR_SERVER)
 
-# Instructor — wymusza na LLM-ie odpowiadanie w formacie Pydantic (z walidacją i retry)
-instructor_client = instructor.from_openai(
-    OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="lm-studio" if "1234" in OLLAMA_URL else "ollama"),
-    mode=instructor.Mode.JSON
-) if OLLAMA_URL else None
+# Instructor — opakowuje TEGO SAMEGO clienta co connect_llm nam dał
+# Dodaje response_model= (walidacja Pydantic + retry)
+instructor_client = instructor.from_openai(client, mode=instructor.Mode.JSON) if client else None
 
 if client:
     print(f"\\nKlient LLM gotowy!  Model: {MODEL_NAME}")
