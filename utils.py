@@ -9,6 +9,19 @@ import matplotlib.pyplot as plt
 import io
 import tensorflow as tf
 
+def ensure_package(package_name, pip_name=None):
+    """Instaluje pakiet jeśli nie jest dostępny. Użyj pip_name gdy nazwa pip != import."""
+    import importlib
+    try:
+        importlib.import_module(package_name)
+    except ImportError:
+        import subprocess, sys
+        pip_name = pip_name or package_name
+        print(f"Instaluję {pip_name}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", pip_name])
+        print(f"✅ {pip_name} zainstalowany!")
+
+
 DATA_FILES = {
     "catvsnotcat": {
         "file_id": "1KE3IOH0OxPI5QTeV2WI9Oi8GIVTBC8vw",
@@ -181,7 +194,7 @@ def _predict_one(model, image, classNames):
 
 
 def _build_title(models_dict, image, classNames):
-    """Buduje tytuł z predykcjami wszystkich modeli."""
+    """Buduje tytuł z predykcjami wszystkich modeli (każdy w nowej linii)."""
     if len(models_dict) == 1:
         model = list(models_dict.values())[0]
         label, prob = _predict_one(model, image, classNames)
@@ -190,7 +203,7 @@ def _build_title(models_dict, image, classNames):
     for name, model in models_dict.items():
         label, prob = _predict_one(model, image, classNames)
         parts.append(f"{name}: {label} ({prob:.0%})")
-    return "  |  ".join(parts)
+    return "\n".join(parts)
 
 
 def predict_image_from_files(models, my_button, classNames):
@@ -370,6 +383,80 @@ def show_tokens(text, label='', model='gpt-4o'):
     display(HTML(html))
 
 
+def plot_training_comparison(histories, figsize=None):
+    """Porównanie accuracy i loss wielu modeli obok siebie, ze wspólną osią Y.
+
+    histories: dict {nazwa: history_obiekt_lub_None}
+        Modele z wartością None są pomijane (jeszcze nie wytrenowane).
+        history może być obiektem Keras (history.history) lub dict.
+
+    Przykład użycia w notebooku:
+        plot_training_comparison({
+            'FFNN': globals().get('history_model'),
+            'Dropout': globals().get('history_model_reg'),
+            'CNN': globals().get('history_model_cnn'),
+        })
+    """
+    # Filtruj None i wyciągnij dict z history
+    items = []
+    for name, h in histories.items():
+        if h is None:
+            continue
+        hd = h.history if hasattr(h, 'history') else h
+        items.append((name, hd))
+
+    if not items:
+        print("Brak dostępnych wyników do wyświetlenia.")
+        return
+
+    n = len(items)
+    if figsize is None:
+        figsize = (6 * n, 8)
+
+    fig, axes = plt.subplots(nrows=2, ncols=n, figsize=figsize, squeeze=False)
+
+    # Wspólne zakresy osi Y
+    all_acc = [v for _, hd in items for v in hd['accuracy'] + hd['val_accuracy']]
+    all_loss = [v for _, hd in items for v in hd['loss'] + hd['val_loss']]
+    acc_min = 0
+    acc_max = 1
+    loss_max = max(all_loss) * 1.05
+
+    colors = {'train': '#1f77b4', 'val': '#ff7f0e'}
+
+    for col, (name, hd) in enumerate(items):
+        # Accuracy
+        ax = axes[0][col]
+        ax.plot(hd['accuracy'], color=colors['train'], label='train')
+        ax.plot(hd['val_accuracy'], color=colors['val'], label='val')
+        best_val = max(hd['val_accuracy'])
+        best_ep = hd['val_accuracy'].index(best_val)
+        ax.axhline(y=best_val, color=colors['val'], linestyle=':', alpha=0.4)
+        ax.plot(best_ep, best_val, 'o', color=colors['val'], markersize=6)
+        ax.set_title(f'{name}\nbest val: {best_val:.3f} (ep {best_ep+1})', fontsize=11)
+        ax.set_xlabel('epoch')
+        ax.set_ylim(acc_min, acc_max)
+        if col == 0:
+            ax.set_ylabel('accuracy')
+        ax.legend(loc='lower right', fontsize=9)
+        ax.grid(alpha=0.3)
+
+        # Loss
+        ax = axes[1][col]
+        ax.plot(hd['loss'], color=colors['train'], label='train')
+        ax.plot(hd['val_loss'], color=colors['val'], label='val')
+        ax.set_title(f'{name} — loss', fontsize=11)
+        ax.set_xlabel('epoch')
+        ax.set_ylim(0, loss_max)
+        if col == 0:
+            ax.set_ylabel('loss')
+        ax.legend(loc='upper right', fontsize=9)
+        ax.grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -521,45 +608,82 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
-def connect_llm(instructor_server="http://192.168.1.100:11434"):
-    """Wykryj działający LLM i zwróć (OpenAI_client, model_name, base_url).
+def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
+    """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
-    Kolejność prób: LM Studio → auto-launch lms → Ollama → serwer prowadzącego.
+    Kolejność prób:
+      1. LM Studio lokalne (port 1234, potem port z lecturer_server)
+      2. Auto-launch LM Studio (jeśli `lms` w PATH)
+      3. Ollama lokalna (port 11434)
+      4. Serwer prowadzącego — próbuje LM Studio, potem Ollama
+
+    Zwraca:
+        client           — do function calling (tools=)
+        instructor_client — do structured output (response_model=), lub None
+        model_name       — nazwa modelu
+
     Zwraca (None, None, None) jeśli nic nie znalezione.
     """
     from openai import OpenAI
 
-    # 1) LM Studio
-    print("Szukam LM Studio (port 1234)...")
-    models = detect_lmstudio()
-    if not models:
-        models = _try_launch_lms() and detect_lmstudio()
-    if models:
-        model = pick_best_model(models) or models[0]
-        url = "http://localhost:1234"
-        client = OpenAI(base_url=f"{url}/v1", api_key="lm-studio")
-        print(f"✓ LM Studio! Model: {model}")
-        return client, model, url
+    def _make_clients(base_url, api_key, model):
+        """Tworzy oba klienty: zwykły + instructor."""
+        client = OpenAI(base_url=f"{base_url}/v1", api_key=api_key)
+        try:
+            import instructor
+            instr = instructor.from_openai(client, mode=instructor.Mode.JSON)
+        except Exception:
+            instr = None
+        return client, instr, model
+
+    # 1) LM Studio lokalne — domyślny port + port z lecturer_server
+    lms_ports = [1234]
+    try:
+        from urllib.parse import urlparse
+        _port = urlparse(lecturer_server or "").port
+        if _port and _port != 1234:
+            lms_ports.append(_port)
+    except Exception:
+        pass
+
+    for port in lms_ports:
+        url = f"http://localhost:{port}"
+        print(f"Szukam LM Studio (port {port})...")
+        models = detect_lmstudio(url)
+        if not models and port == 1234:
+            models = _try_launch_lms() and detect_lmstudio(url)
+        if models:
+            model = pick_best_model(models) or models[0]
+            print(f"✓ LM Studio (port {port})! Model: {model}")
+            return _make_clients(url, "lm-studio", model)
 
     # 2) Ollama lokalna
     print("  LM Studio niedostępne.\nSzukam lokalnej Ollamy (port 11434)...")
     models = detect_ollama()
     if models:
         model = pick_best_model(models)
-        url = "http://localhost:11434"
-        client = OpenAI(base_url=f"{url}/v1", api_key="ollama")
         print(f"✓ Lokalna Ollama! Model: {model}")
-        return client, model, url
+        return _make_clients("http://localhost:11434", "ollama", model)
 
-    # 3) Serwer prowadzącego
-    if instructor_server:
-        print("  Ollama niedostępna.\nPróbuję serwer prowadzącego...")
-        models = detect_ollama(instructor_server)
+    # 3) Serwer prowadzącego — próbuj LM Studio, potem Ollama
+    _is_placeholder = not lecturer_server or "ADRES_SERWERA" in lecturer_server
+    if lecturer_server and not _is_placeholder:
+        print(f"  Lokalny LLM niedostępny.\nPróbuję serwer prowadzącego ({lecturer_server})...")
+
+        # 3a) LM Studio na serwerze prowadzącego
+        models = detect_lmstudio(lecturer_server)
+        if models:
+            model = pick_best_model(models) or models[0]
+            print(f"✓ Serwer prowadzącego (LM Studio)! Model: {model}")
+            return _make_clients(lecturer_server, "lm-studio", model)
+
+        # 3b) Ollama na serwerze prowadzącego (inny port?)
+        #     Spróbuj ten sam adres ale z endpointem Ollamy
+        models = detect_ollama(lecturer_server)
         if models:
             model = pick_best_model(models)
-            client = OpenAI(base_url=f"{instructor_server}/v1", api_key="ollama")
-            print(f"✓ Serwer prowadzącego! Model: {model}")
-            return client, model, instructor_server
+            print(f"✓ Serwer prowadzącego (Ollama)! Model: {model}")
+            return _make_clients(lecturer_server, "ollama", model)
 
     print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
     return None, None, None
