@@ -977,7 +977,35 @@ Zamiast tekstu dostajemy **obiekt Pythona** z walidowanymi polami.
 
 To jest ta sama technika, którą używają profesjonalne systemy AI:
 - Zamiast *"Kraków ma 800 tysięcy mieszkańców"*
-- Dostajemy `PopulationInfo(city="Kraków", population=800000, rank_in_poland=2)`"""))
+- Dostajemy `PopulationInfo(city="Kraków", population=800000, rank_in_poland=2)`
+
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:14px; border-radius:4px;">
+
+**Pydantic vs. instructor — kto co robi?**
+
+| | **Pydantic** | **instructor** |
+|---|---|---|
+| **Rola** | Walidator — sprawdza czy dane pasują do schematu | Orkiestrator — wymusza schemat na LLM-ie |
+| **Gdy LLM pominie pole** | `ValidationError` → crash | Łapie błąd, wysyła do LLM-a feedback: *"Brakuje pola humidity_percent"* i każe wygenerować ponownie |
+| **Retry** | Nie — nie wie że rozmawia z LLM-em | Tak — domyślnie do 3 prób |
+
+Czyli: **Pydantic mówi "źle!"**, a **instructor łapie ten błąd i każe LLM-owi poprawić**.
+
+Bez `instructor`, z gołym Pydantic — słaby model który pominie pole → `ValidationError` i koniec.
+Z `instructor` — model dostanie feedback i spróbuje jeszcze raz.
+
+```
+instructor pod maską:
+1. Wyślij prompt + JSON Schema (z Pydantic) do LLM-a
+2. Dostań odpowiedź
+3. Sparsuj przez Pydantic → OK? → zwróć obiekt
+4. ValidationError? → wyślij LLM-owi:
+   "Twoja odpowiedź nie przeszła walidacji:
+    'humidity_percent is required'. Popraw."
+5. Wróć do 2. (max 3 próby)
+```
+
+</div>"""))
 
 cells.append(code("""\
 import instructor
