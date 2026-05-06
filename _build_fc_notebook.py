@@ -126,16 +126,15 @@ Szczegóły instalacji: patrz `setup_local_llm.ipynb` lub `docs/LOKALNE_LLM.md`
 
 cells.append(code("""\
 from utils import connect_llm
-import instructor
 
 # Jeśli nie masz lokalnego LLM-a, wpisz adres serwera prowadzącego (podany na zajęciach):
 INSTRUCTOR_SERVER = "http://192.168.1.100:11434"
 
-client, MODEL_NAME, OLLAMA_URL = connect_llm(instructor_server=INSTRUCTOR_SERVER)
+client, instructor_client, MODEL_NAME = connect_llm(instructor_server=INSTRUCTOR_SERVER)
 
-# Instructor — opakowuje TEGO SAMEGO clienta co connect_llm nam dał
-# Dodaje response_model= (walidacja Pydantic + retry)
-instructor_client = instructor.from_openai(client, mode=instructor.Mode.JSON) if client else None
+# connect_llm zwraca DWA klienty:
+#   client            → do function calling (LLM wybiera narzędzia)
+#   instructor_client → do structured output (LLM odpowiada w formacie Pydantic)
 
 if client:
     print(f"\\nKlient LLM gotowy!  Model: {MODEL_NAME}")
@@ -225,7 +224,7 @@ calc_tool = {
 
 user_question = "Ile to jest 17 razy 23?"
 
-if OLLAMA_URL:
+if client:
     print("╔" + "═"*68 + "╗")
     print("║  KROK 1: Wysyłamy pytanie + opis narzędzia do LLM-a            ║")
     print("╚" + "═"*68 + "╝")
@@ -737,7 +736,7 @@ for t in tools_definition:
 
 cells.append(code("""\
 def ask_with_tools(question, verbose=True):
-    if not OLLAMA_URL:
+    if not client:
         print("LLM niedostępny.")
         return None
 
@@ -790,7 +789,7 @@ pytania = [
     "Oblicz pierwiastek z 256 i powiedz mi pogodę w Poznaniu",
 ]
 
-if OLLAMA_URL:
+if client:
     for q in pytania:
         print(f"\\n{'═'*60}")
         print(f"PYTANIE: {q}")
@@ -831,7 +830,7 @@ tools_definition[0]["function"]["description"] = ...  # Tutaj wpisz swój kod
 try:
     print("Testuję z ZMIENIONYM description:")
     print(f"  get_weather description: '{tools_definition[0]['function']['description']}'")
-    if OLLAMA_URL:
+    if client:
         print()
         ask_with_tools("Jaka jest pogoda w Krakowie?")
 except (TypeError, NameError):
@@ -902,7 +901,7 @@ def get_population(city: str) -> str:
 try:
     print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
     print(f"\\nTest bezpośredni: {get_population('Kraków')}")
-    if OLLAMA_URL:
+    if client:
         print()
         ask_with_tools("Ile mieszkańców ma Kraków?")
 except (TypeError, NameError):
@@ -1003,7 +1002,7 @@ try:
     print("Test bezpośredni:")
     print(search_wikipedia("Kraków"))
     print(f"\\nMamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
-    if OLLAMA_URL:
+    if client:
         print("\\nTest przez LLM:")
         ask_with_tools("Co to jest fotosynteza?")
 except (TypeError, NameError):
@@ -1368,7 +1367,7 @@ while LLM chce wywołać narzędzie:
 
 cells.append(code("""\
 def agent(question, max_steps=6):
-    if not OLLAMA_URL:
+    if not client:
         print("LLM niedostępny.")
         return
 
@@ -1423,7 +1422,7 @@ print("Agent gotowy! Użyj: agent('twoje pytanie')")\
 """))
 
 cells.append(code("""\
-if OLLAMA_URL:
+if client:
     print("Test 1: Prezydenci + obliczenie")
     print("═"*60)
     agent("Ile lat miał Aleksander Kwaśniewski gdy skończył kadencję? Oblicz ile to w przybliżeniu dni.")
@@ -1444,7 +1443,7 @@ Sprawdźmy jak agent radzi sobie z pytaniami o **mało znane fakty** z naszej ba
 Czy LLM użyje naszego lokalnego narzędzia, czy spróbuje szukać na Wikipedii?"""))
 
 cells.append(code("""\
-if OLLAMA_URL:
+if client:
     print("Test: Mało znane fakty o prezydentach")
     print("═"*60)
     agent("Jakie mało znane fakty kryją polscy prezydenci? Sprawdź w bazie prezydentów, szukaj 'mało znany fakt'.")
@@ -1489,7 +1488,7 @@ cells.append(code("""\
 MOJE_PYTANIE = ...  # Tutaj wpisz swój kod — wymyśl pytanie łączące kilka narzędzi
 
 try:
-    if OLLAMA_URL:
+    if client:
         agent(MOJE_PYTANIE)
 except (TypeError, NameError):
     print('⬆️ Wpisz swoje pytanie powyżej')\
@@ -1535,7 +1534,7 @@ TEMAT = "..."  # np. "asystent podróżniczy"
 SYSTEM_PROMPT = "..."  # Tutaj wpisz swój kod — opisz rolę asystenta
 
 def my_agent(question):
-    if not OLLAMA_URL:
+    if not client:
         print("LLM niedostępny.")
         return
 
@@ -1569,7 +1568,7 @@ def my_agent(question):
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
 try:
-    if OLLAMA_URL and TEMAT != "...":
+    if client and TEMAT != "...":
         my_agent("Twoje pierwsze pytanie testowe")
 except (TypeError, NameError):
     print('⬆️ Uzupełnij TEMAT i SYSTEM_PROMPT powyżej')\
