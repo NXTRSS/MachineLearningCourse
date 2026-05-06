@@ -1,13 +1,19 @@
 #!/bin/sh
 #
-# pre-push hook: block pushes containing:
-#   1. commits from unwanted authors/committers
-#   2. LECTURER_SERVER with a real IP/port (not the placeholder)
+# pre-push hook — automatyczne czyszczenie przed pushem na remote.
+#
+# Co robi:
+#   1. Blokuje commity z zabronionym autorem/committerem
+#   2. Zamazuje LECTURER_SERVER (prawdziwy IP:port → placeholder)
+#   3. Odpala przed_zajeciami.py (czyści outputy, resetuje stuby, zwija podpowiedzi)
+#   4. Jeśli cokolwiek się zmieniło → commituje fix i blokuje push
+#      (żebyś zobaczył co się zmieniło i spróbował push ponownie)
 #
 # Activate with: git config core.hooksPath .githooks
 
 BLOCKED_EMAILS="kamil.jedryczek@airslate.com"
 BLOCKED_NAMES="claude"
+PLACEHOLDER='http://ADRES_SERWERA:PORT'
 
 # ── CHECK 1: Author / committer ──────────────────────────────────────
 
@@ -48,33 +54,82 @@ while read local_ref local_sha remote_ref remote_sha; do
     done
 done
 
-# ── CHECK 2: LECTURER_SERVER nie może zawierać prawdziwego adresu ─────
+# ── AUTO-FIX 1: Zamazaj LECTURER_SERVER ──────────────────────────────
 #
-# Szukamy linii z LECTURER_SERVER = "http://..." gdzie adres NIE jest
-# placeholderem (ADRES_SERWERA). Sprawdzamy pliki które idą do repo.
+# Zamienia prawdziwy adres (np. http://192.168.x.x:XXXX)
+# na placeholder http://ADRES_SERWERA:PORT.
+# Obsługuje zarówno .py (normalne cudzysłowy) jak i .ipynb (escaped \").
 
-LEAKED=""
-for file in utils.py _build_fc_notebook.py Function_Calling.ipynb; do
-    if [ -f "$file" ]; then
-        # Szukaj LECTURER_SERVER z prawdziwym IP/adresem (nie placeholderem)
-        match=$(grep -n 'LECTURER_SERVER.*http' "$file" | grep -v 'ADRES_SERWERA' | grep -v '#.*ADRES' | head -1)
-        if [ -n "$match" ]; then
-            LEAKED="$LEAKED\n  $file: $match"
-        fi
-        # Szukaj też lecturer_server= z prawdziwym adresem w domyślnym parametrze
-        match=$(grep -n 'lecturer_server=.*http' "$file" | grep -v 'ADRES_SERWERA' | head -1)
-        if [ -n "$match" ]; then
-            LEAKED="$LEAKED\n  $file: $match"
-        fi
-    fi
-done
+FIXED_FILES=$(python3 -c "
+import re
 
-if [ -n "$LEAKED" ]; then
-    echo "BLOCKED: LECTURER_SERVER zawiera prawdziwy adres serwera!"
-    echo "Znaleziono w:"
-    echo "$LEAKED"
+placeholder = '${PLACEHOLDER}'
+files_fixed = []
+
+for path in ['utils.py', '_build_fc_notebook.py', 'Function_Calling.ipynb']:
+    try:
+        text = open(path, encoding='utf-8').read()
+    except FileNotFoundError:
+        continue
+    if 'ADRES_SERWERA' in text:
+        continue
+
+    new = re.sub(
+        r'((?:LECTURER_SERVER|lecturer_server)\s*=\s*)(\\\\?\")http://[^\"\\\\]+(\\\\?\")',
+        rf'\g<1>\g<2>{placeholder}\g<3>',
+        text,
+    )
+    if new != text:
+        open(path, 'w', encoding='utf-8').write(new)
+        files_fixed.append(path)
+
+print(' '.join(files_fixed))
+")
+
+# ── AUTO-FIX 2: przed_zajeciami.py ──────────────────────────────────
+#
+# Czyści outputy, resetuje stuby, zwija podpowiedzi.
+
+PRZED_ZAJECIAMI=""
+if [ -f "przed_zajeciami.py" ]; then
+    echo "[pre-push] Uruchamiam przed_zajeciami.py..."
+    python3 przed_zajeciami.py 2>&1 | sed 's/^/  /'
+    PRZED_ZAJECIAMI="tak"
+fi
+
+# ── COMMIT jeśli cokolwiek się zmieniło ──────────────────────────────
+
+CHANGED_FILES=$(git diff --name-only)
+if [ -n "$CHANGED_FILES" ]; then
     echo ""
-    echo "Fix: zamień na placeholder 'http://ADRES_SERWERA:PORT'"
-    echo "  lub uruchom: python _build_fc_notebook.py  (przebuduje notebook z placeholderem)"
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║  pre-push: poprawiłem pliki przed wysłaniem na remote   ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    echo ""
+
+    if [ -n "$FIXED_FILES" ]; then
+        echo "  Zamazano LECTURER_SERVER w: $FIXED_FILES"
+    fi
+    if [ -n "$PRZED_ZAJECIAMI" ]; then
+        echo "  Uruchomiono przed_zajeciami.py (outputy, stuby, podpowiedzi)"
+    fi
+
+    echo ""
+    echo "  Zmiany:"
+    git diff --stat | sed 's/^/    /'
+    echo ""
+
+    # Commituj poprawki — TYLKO zmienione tracked pliki (nie -A!)
+    # -z + xargs -0 obsługuje polskie znaki w nazwach plików
+    git diff -z --name-only | xargs -0 git add --
+    GIT_COMMITTER_NAME="NXTRSS" GIT_COMMITTER_EMAIL="kamillo_j@yahoo.com" \
+        git commit --author="NXTRSS <kamillo_j@yahoo.com>" \
+        -m "auto: sanitize LECTURER_SERVER + przed_zajeciami.py" \
+        --quiet
+
+    echo "  ✓ Commitnąłem poprawki."
+    echo ""
+    echo "  Uruchom ponownie:  git push"
+    echo ""
     exit 1
 fi
