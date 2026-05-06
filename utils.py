@@ -418,8 +418,8 @@ def plot_training_comparison(histories, figsize=None):
     # Wspólne zakresy osi Y
     all_acc = [v for _, hd in items for v in hd['accuracy'] + hd['val_accuracy']]
     all_loss = [v for _, hd in items for v in hd['loss'] + hd['val_loss']]
-    acc_min = max(0, min(all_acc) - 0.05)
-    acc_max = min(1, max(all_acc) + 0.05)
+    acc_min = 0
+    acc_max = 1
     loss_max = max(all_loss) * 1.05
 
     colors = {'train': '#1f77b4', 'val': '#ff7f0e'}
