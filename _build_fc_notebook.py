@@ -146,14 +146,14 @@ if client:
 """))
 
 cells.append(code("""\
-# Nadpisanie modelu na czas testów (zakomentuj przed mergem na main):
+# Nadpisanie modelu na czas testów (odkomentuj aby użyć innego modelu/portu):
 
-from openai import OpenAI
-import instructor
-client = OpenAI(base_url="http://localhost:4242/v1", api_key="lm-studio")
-instructor_client = instructor.from_openai(client, mode=instructor.Mode.JSON)
-MODEL_NAME = "gemma-4-e4b-it-mlx"
-print(f"Nadpisano! Używam: {MODEL_NAME}")\
+# from openai import OpenAI
+# import instructor
+# client = OpenAI(base_url="http://localhost:4242/v1", api_key="lm-studio")
+# instructor_client = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
+# MODEL_NAME = "gemma-4-e4b-it-mlx"
+# print(f"Nadpisano! Używam: {MODEL_NAME}")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
@@ -378,6 +378,15 @@ cells.append(md("""\
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
 Ta sekcja pokazuje <b>drugi</b> sposób użycia Pydantic z LLM-em. Nie jest wymagana do dalszej pracy
 z Function Calling — możesz ją pominąć i wrócić później.
+</div>
+
+<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:12px; border-radius:4px; margin-top:8px;">
+⏱️ <b>Uwaga:</b> Komórki w tej sekcji mogą wykonywać się <b>20–60 sekund</b> (zależnie od modelu).
+Instructor wymusza format odpowiedzi przez prompt engineering — LLM musi wygenerować poprawny JSON,
+a jeśli się pomyli, instructor powtarza zapytanie. To wolniejsze niż zwykły Function Calling.<br><br>
+Jeśli korzystacie z <b>jednego serwera prowadzącego</b> — zapytania obsługiwane są jedno po drugim (kolejka).
+Przy 20 osobach i ~30s na zapytanie, ostatnia osoba w kolejce może czekać nawet kilka minut.
+Cierpliwości! 🙂
 </div>
 
 W Function Calling Pydantic opisuje **wejście** narzędzia (argumenty).

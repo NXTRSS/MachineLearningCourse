@@ -618,7 +618,7 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
         client = OpenAI(base_url=f"{base_url}/v1", api_key=api_key)
         try:
             import instructor
-            instr = instructor.from_openai(client, mode=instructor.Mode.JSON)
+            instr = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
         except Exception:
             instr = None
         return client, instr, model
