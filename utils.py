@@ -521,11 +521,11 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
-def connect_llm(lecturer_server="http://192.168.1.100:4242"):
+def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
     """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
     Kolejność prób:
-      1. LM Studio lokalne (port 1234)
+      1. LM Studio lokalne (port 1234, potem port z lecturer_server)
       2. Auto-launch LM Studio (jeśli `lms` w PATH)
       3. Ollama lokalna (port 11434)
       4. Serwer prowadzącego — próbuje LM Studio, potem Ollama
@@ -549,15 +549,26 @@ def connect_llm(lecturer_server="http://192.168.1.100:4242"):
             instr = None
         return client, instr, model
 
-    # 1) LM Studio lokalne
-    print("Szukam LM Studio (port 1234)...")
-    models = detect_lmstudio()
-    if not models:
-        models = _try_launch_lms() and detect_lmstudio()
-    if models:
-        model = pick_best_model(models) or models[0]
-        print(f"✓ LM Studio! Model: {model}")
-        return _make_clients("http://localhost:1234", "lm-studio", model)
+    # 1) LM Studio lokalne — domyślny port + port z lecturer_server
+    lms_ports = [1234]
+    try:
+        from urllib.parse import urlparse
+        _port = urlparse(lecturer_server or "").port
+        if _port and _port != 1234:
+            lms_ports.append(_port)
+    except Exception:
+        pass
+
+    for port in lms_ports:
+        url = f"http://localhost:{port}"
+        print(f"Szukam LM Studio (port {port})...")
+        models = detect_lmstudio(url)
+        if not models and port == 1234:
+            models = _try_launch_lms() and detect_lmstudio(url)
+        if models:
+            model = pick_best_model(models) or models[0]
+            print(f"✓ LM Studio (port {port})! Model: {model}")
+            return _make_clients(url, "lm-studio", model)
 
     # 2) Ollama lokalna
     print("  LM Studio niedostępne.\nSzukam lokalnej Ollamy (port 11434)...")
@@ -568,7 +579,8 @@ def connect_llm(lecturer_server="http://192.168.1.100:4242"):
         return _make_clients("http://localhost:11434", "ollama", model)
 
     # 3) Serwer prowadzącego — próbuj LM Studio, potem Ollama
-    if lecturer_server:
+    _is_placeholder = not lecturer_server or "ADRES_SERWERA" in lecturer_server
+    if lecturer_server and not _is_placeholder:
         print(f"  Lokalny LLM niedostępny.\nPróbuję serwer prowadzącego ({lecturer_server})...")
 
         # 3a) LM Studio na serwerze prowadzącego
