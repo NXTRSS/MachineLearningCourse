@@ -456,13 +456,39 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-def display_generated_city(prompt):
+def reset_seed(seed=42):
+    """Resetuje wszystkie źródła losowości — Python random, NumPy, TensorFlow.
+
+    Wywołuj na początku każdej komórki, która robi coś losowego (inicjalizacja wag,
+    trening z dropoutem, shuffle batchy, sampling z rozkładu) — wtedy wynik jest
+    powtarzalny niezależnie od kolejności wykonania komórek.
+    """
+    import random as _random
+    _random.seed(seed)
+    np.random.seed(seed)
+    try:
+        import tensorflow as _tf
+        _tf.random.set_seed(seed)
+    except ImportError:
+        pass
+
+
+def display_generated_city(prompt, real_cities=None):
     """Wyświetla wygenerowaną nazwę miasta z Modelu Języka, ładnie sformatowaną z emoji 🏘️.
 
     Argument `prompt` to pełny ciąg z tokenami specjalnymi % i ! — np. '%Babciowice!'.
+    Jeżeli podasz `real_cities` (set/list nazw treningowych), pod nazwą wyświetli się
+    marker czy taka nazwa już istnieje w zbiorze, czy jest nowa.
     """
     from IPython.display import display, Markdown
-    display(Markdown(f"## 🏘️ **Wygenerowana nazwa miasta:** `{prompt[1:-1].title()}`"))
+    name = prompt[1:-1]  # bez tokenów % i !
+    msg = f"## 🏘️ **Wygenerowana nazwa miasta:** `{name.title()}`"
+    if real_cities is not None:
+        if name in real_cities:
+            msg += "\n\n⚠️ Ta nazwa **istnieje** w zbiorze treningowym (model ją skopiował)"
+        else:
+            msg += "\n\n✨ Nowa, **nieistniejąca** nazwa — model ją wymyślił"
+    display(Markdown(msg))
 
 
 def visualize_probabilities(probabilities, step, tokenizer, prompt, chosen_idx, show=True):
@@ -618,7 +644,7 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
         client = OpenAI(base_url=f"{base_url}/v1", api_key=api_key)
         try:
             import instructor
-            instr = instructor.from_openai(client, mode=instructor.Mode.JSON)
+            instr = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
         except Exception:
             instr = None
         return client, instr, model
