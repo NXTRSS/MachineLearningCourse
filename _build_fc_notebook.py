@@ -476,6 +476,95 @@ else:
 """))
 
 cells.append(md("""\
+#### Mechanizm retry — instructor sam naprawia błędy"""))
+
+cells.append(md("""\
+Jedną z największych zalet `instructor` jest **automatyczny retry z feedbackiem**.
+Jeśli LLM zwróci niepoprawny JSON, instructor:
+1. Łapie błąd parsowania/walidacji
+2. **Odsyła go do LLM-a** jako wiadomość: *"Popraw odpowiedź, oto co było źle: ..."*
+3. LLM poprawia się — i tak do `max_retries` prób
+
+Zobaczmy to na żywo! Przechwytujemy odpowiedź LLM-a i **celowo psujemy JSON**
+zanim instructor go zobaczy. Instructor wykryje błąd i poprosi LLM-a o poprawę:"""))
+
+cells.append(code("""\
+# --- Sabotaż! Przechwytujemy odpowiedź LLM-a i psujemy JSON ---
+_orig_create = client.chat.completions.create
+_call_count = [0]
+
+def _sabotage(*args, **kwargs):
+    _call_count[0] += 1
+
+    # Przy retry — pokazujemy CO instructor wysyła do LLM-a
+    if _call_count[0] == 2:
+        msgs = kwargs.get('messages', [])
+        print("  🔍 Co instructor wysyła do LLM-a przy retry:")
+        print("  " + "─" * 55)
+        for m in msgs:
+            role = m.get('role', '?')
+            content = str(m.get('content', ''))
+            if len(content) > 300:
+                content = content[:300] + "..."
+            print(f"  [{role}] {content}\\n")
+        print("  " + "─" * 55 + "\\n")
+
+    resp = _orig_create(*args, **kwargs)
+    content = resp.choices[0].message.content
+
+    if _call_count[0] == 1:  # tylko pierwszą odpowiedź psujemy
+        print(f"  📡 Próba 1 — oryginalna odpowiedź LLM-a:")
+        print(f"      {content[:200]}\\n")
+
+        broken = content.replace("}", "###ZEPSUTE###")
+        print(f"  💥 Psujemy JSON przed oddaniem instructorowi:")
+        print(f"      {broken[:200]}\\n")
+        resp.choices[0].message.content = broken
+    else:
+        print(f"  📡 Próba {_call_count[0]} — LLM poprawił odpowiedź:")
+        print(f"      {content[:200]}\\n")
+    return resp
+
+client.chat.completions.create = _sabotage
+
+# Tworzymy nowego instructor_client z "popsutym" klientem
+import instructor
+_sabotaged_ic = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
+
+class CityRetryDemo(BaseModel):
+    name: str = Field(..., description="Nazwa miasta")
+    country: str = Field(..., description="Kraj")
+    population_approx: int = Field(..., description="Przybliżona liczba mieszkańców")
+
+print("🔬 Demo: psujemy JSON + podglądamy retry!\\n")
+
+city = _sabotaged_ic.chat.completions.create(
+    model=MODEL_NAME,
+    response_model=CityRetryDemo,
+    messages=[{"role": "user", "content": "Opowiedz o Krakowie"}],
+    max_retries=3,
+)
+print(f"  ✅ Sukces! {city.name}, {city.country}, {city.population_approx:,}")
+
+# Przywracamy oryginalny client.create (ważne dla dalszych komórek!)
+client.chat.completions.create = _orig_create\
+"""))
+
+cells.append(md("""\
+<div style="background:#d4edda; border-left:4px solid #28a745; padding:12px; border-radius:4px;">
+<b>Co się właśnie stało?</b>
+<ol>
+<li><b>[system]</b> — Instructor wstrzyknął JSON Schema do system message</li>
+<li><b>[user]</b> — Nasze pytanie + instrukcja "Return JSON in codeblock"</li>
+<li><b>[assistant]</b> — Zepsuta odpowiedź (instructor "widzi" ją jako oryginalną odpowiedź LLM-a)</li>
+<li><b>[user]</b> — <code>"Correct your JSON ONLY RESPONSE, based on the following errors:"</code> + pełny traceback!</li>
+<li>LLM czyta feedback i <b>sam się poprawia</b></li>
+</ol>
+W prawdziwym użyciu nie musisz nic psuć — instructor robi to <b>automatycznie</b>
+gdy LLM zwróci niepoprawny format. To Twoja siatka bezpieczeństwa! 🛡️
+</div>"""))
+
+cells.append(md("""\
 #### Function Calling vs. Structured Output — dwa różne mechanizmy!
 
 <div style="background:#fff3cd; border-left:4px solid #ffc107; padding:14px; border-radius:4px;">
@@ -489,7 +578,7 @@ cells.append(md("""\
 
 **Analogia kuchenna:**
 - **Function Calling** = LLM jest **kelnerem** — przyjmuje zamówienie i mówi kucharzowi (naszemu kodowi) co ugotować
-- **Structured Output** = LLM jest **formularzem** — musi wypełnić każde pole, nie może pominąć
+- **Structured Output** = LLM jest **kucharzem** który musi podać danie dokładnie wg karty — nazwa, składniki, czas przygotowania, każde pole wypełnione, zero improwizacji
 
 </div>"""))
 
