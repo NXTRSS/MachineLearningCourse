@@ -123,6 +123,52 @@ except KeyError as e:
 
 **Zasada:** `Restart Kernel and Run All` → zero czerwonych tracebacków, zero przerwań.
 
+### Reprodukowalność — `reset_seed(SEED)` na początku każdej "stochastycznej" komórki
+
+Studenci często wykonują komórki **nie po kolei** lub **kilka razy** — żeby wyniki były powtarzalne, każda komórka która robi cokolwiek losowego (inicjalizacja wag modelu, trening z dropoutem, shuffle batchy, sampling z rozkładu) musi sama zresetować wszystkie źródła losowości.
+
+W `utils.py` jest helper:
+
+```python
+def reset_seed(seed=42):
+    import random as _random
+    _random.seed(seed)
+    np.random.seed(seed)
+    try:
+        import tensorflow as _tf
+        _tf.random.set_seed(seed)
+    except ImportError:
+        pass
+```
+
+W notebooku — jedna stała `SEED = 42` na samej górze (cell z importami) plus `reset_seed(SEED)` na początku KAŻDEJ komórki która coś losuje:
+
+```python
+# komórka tworząca model (random init wag)
+reset_seed(SEED)
+model = LanguageModel()
+
+# komórka treningu (dropout, shuffle)
+reset_seed(SEED)
+history = model.fit(...)
+
+# komórka samplingu (np.random.choice)
+reset_seed(SEED)
+nazwa = sample_model("%")
+```
+
+**Test reprodukowalności:** Restart Kernel and Run All → wszystkie outputy identyczne. Run All drugi raz → wciąż identyczne. Wykonanie pojedynczej komórki dwa razy → wynik się nie zmienia.
+
+**Skrypty hyperparameter search** (np. `lm_search_bayesian.py`) — używają tego samego seeda i resetują przed każdym trial'em żeby search był deterministyczny:
+
+```python
+def objective(trial):
+    reset_seed(SEED)  # żeby każdy trial miał te same warunki początkowe
+    ...
+```
+
+Sampler Optuna też dostaje seed: `TPESampler(seed=SEED)`.
+
 ### Puste linie wokół linii do uzupełnienia
 
 Każda linia kodu którą student ma uzupełnić (z `...` i komentarzem `# Tutaj wpisz swój kod`)

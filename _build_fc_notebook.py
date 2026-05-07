@@ -146,14 +146,14 @@ if client:
 """))
 
 cells.append(code("""\
-# Nadpisanie modelu na czas testów (odkomentuj aby użyć innego modelu/portu):
+# Nadpisanie modelu na czas testów (zakomentuj przed mergem na main):
 
-# from openai import OpenAI
-# import instructor
-# client = OpenAI(base_url="http://localhost:4242/v1", api_key="lm-studio")
-# instructor_client = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
-# MODEL_NAME = "gemma-4-e4b-it-mlx"
-# print(f"Nadpisano! Używam: {MODEL_NAME}")\
+from openai import OpenAI
+import instructor
+client = OpenAI(base_url="http://localhost:4242/v1", api_key="lm-studio")
+instructor_client = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
+MODEL_NAME = "gemma-4-e4b-it-mlx"
+print(f"Nadpisano! Używam: {MODEL_NAME}")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
