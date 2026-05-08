@@ -250,7 +250,12 @@ def calculate_function_call(user_prompt):
 
     tok_myslenia = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
     if tok_myslenia:
-        print(f"  Tok myślenia LLM-a: {tok_myslenia[:300]}")
+        print(f"  🧠 Tok myślenia (reasoning):")
+        for line in str(tok_myslenia)[:500].split("\\n"):
+            print(f"     {line}")
+        print()
+    if msg.content and msg.tool_calls:
+        print(f"  💬 LLM mówi: {msg.content[:300]}")
         print()
 
     if msg.tool_calls:
@@ -275,6 +280,7 @@ def calculate_function_call(user_prompt):
 
         print()
         box("KROK 4: LLM formułuje ostateczną odpowiedź")
+        print()
         display(Markdown(final.choices[0].message.content))
     else:
         print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
@@ -707,10 +713,11 @@ def search_presidents(query: str) -> str:
         return "Brak danych — nie znaleziono pliku prezydenci_polski.md"
 
     query_lower = query.lower()
+    words = query_lower.split()
     wyniki = []
     for p in PREZYDENCI:
         all_text = " ".join(str(v) for v in p.values()).lower()
-        if query_lower in all_text:
+        if all(w in all_text for w in words):
             lines = [f"### {p.get('imię', '?')}"]
             for key, val in p.items():
                 if key != 'imię':
@@ -806,34 +813,50 @@ def ask_with_tools(question, verbose=True):
     assistant_msg = response.choices[0].message
 
     if verbose:
+        # Reasoning tokens (Qwen3 → reasoning_content, inne modele → inne pola)
         tok_myslenia = next((getattr(assistant_msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(assistant_msg, f, None)), None)
         if tok_myslenia:
-            print(f"  Tok myślenia: {tok_myslenia[:300]}")
+            print(f"  🧠 Tok myślenia (reasoning):")
+            for line in str(tok_myslenia)[:500].split("\\n"):
+                print(f"     {line}")
+            print()
+
+        # Treść odpowiedzi (Gemma, inne modele — czasem piszą tekst OBOK tool_calls)
+        if assistant_msg.content and assistant_msg.tool_calls:
+            print(f"  💬 LLM mówi: {assistant_msg.content[:300]}")
+            print()
 
     if not assistant_msg.tool_calls:
         if verbose:
             print(f"  Narzędzie: BRAK (LLM odpowiedział sam)")
+            print()
             display(Markdown(assistant_msg.content))
         return assistant_msg.content
 
+    tool_calls = assistant_msg.tool_calls
+    if verbose and len(tool_calls) > 1:
+        print(f"  LLM wywołuje {len(tool_calls)} narzędzia naraz!")
+
     messages.append(assistant_msg)
-    for tool_call in assistant_msg.tool_calls:
+    for i, tool_call in enumerate(tool_calls, 1):
         func_name = tool_call.function.name
         func_args = json.loads(tool_call.function.arguments)
 
         if verbose:
-            print(f"  Narzędzie: {func_name}({func_args})")
+            prefix = f"  [{i}/{len(tool_calls)}] " if len(tool_calls) > 1 else "  "
+            print(f"{prefix}Narzędzie: {func_name}({func_args})")
 
         result = AVAILABLE_TOOLS.get(func_name, lambda **kw: "Nieznane narzędzie")(**func_args)
         if verbose:
-            print(f"  Wynik:     {result[:150]}")
+            prefix = f"  {' ' * len(f'[{i}/{len(tool_calls)}] ')}" if len(tool_calls) > 1 else "  "
+            print(f"{prefix}Wynik:     {result[:150]}")
         messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
 
     final = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.1)
     final_answer = final.choices[0].message.content
 
     if verbose:
-        print("  Odpowiedź:")
+        print("  Odpowiedź:\\n")
         display(Markdown(final_answer))
     return final_answer
 
@@ -1392,9 +1415,16 @@ def agent(question, max_steps=6):
 
         msg = response.choices[0].message
 
+        # Pokaż reasoning / content jeśli model je generuje
+        tok = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
+        if tok:
+            print(f"\\n  🧠 Reasoning: {str(tok)[:300]}")
+        if msg.content and msg.tool_calls:
+            print(f"  💬 LLM mówi: {msg.content[:300]}")
+
         if not msg.tool_calls:
             print(f"\\n  Krok {step+1}: LLM generuje odpowiedź")
-            print(f"  {'─'*50}")
+            print(f"  {'─'*50}\\n")
             display(Markdown(msg.content))
             return msg.content
 
@@ -1555,7 +1585,7 @@ def my_agent(question):
         msg = response.choices[0].message
 
         if not msg.tool_calls:
-            print(f"\\n  Odpowiedź:")
+            print(f"\\n  Odpowiedź:\\n")
             display(Markdown(msg.content))
             return
 
