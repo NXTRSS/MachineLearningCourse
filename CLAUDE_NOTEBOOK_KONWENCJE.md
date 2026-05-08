@@ -598,7 +598,44 @@ Zostają na gałęzi `docker-uv-setup`.
 
 ---
 
-## 9. Gałęzie repo
+## 9. Wyświetlanie odpowiedzi LLM — `display(Markdown(...))`
+
+> **Dotyczy tylko notebooków pracujących z LLM-ami** (Function Calling, RAG, itp.).
+> Zwykłe `print()` w notebookach z regresją, sieciami neuronowymi itp. zostają bez zmian.
+
+### Problem
+
+LLM-y zwracają tekst sformatowany w Markdown (bold, listy, nagłówki).
+Zwykły `print()` wyświetla go jako surowy tekst — studenci nie widzą formatowania.
+
+### Rozwiązanie
+
+```python
+from IPython.display import display, Markdown
+
+# Zamiast:
+print(response.choices[0].message.content)
+
+# Używaj:
+display(Markdown(response.choices[0].message.content))
+```
+
+### Kiedy stosować
+
+| Sytuacja | Użyj |
+|----------|------|
+| Finalna odpowiedź LLM-a (tekst dla użytkownika) | `display(Markdown(...))` |
+| Debugowanie, podgląd JSON, surowe dane | `print()` |
+| Wyniki obliczeń, metryki, logi | `print()` |
+| Zwykłe notebooki (regresja, NN, embeddingi) | `print()` |
+
+### Import
+
+`from IPython.display import display, Markdown` — dodaj w komórce z importami na początku notebooka.
+
+---
+
+## 10. Gałęzie repo
 
 | Gałąź | Zawartość |
 |-------|-----------|
