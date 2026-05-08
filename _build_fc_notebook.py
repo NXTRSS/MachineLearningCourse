@@ -915,27 +915,25 @@ import copy
 test_tools = copy.deepcopy(tools_definition)
 
 # --- TUTAJ ZMIEŃ description ---
+
 test_tools[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"
 
-# --- TUTAJ WPISZ PYTANIE (np. "Jaka jest pogoda w Krakowie?") ---
-
-PYTANIE = ...
-
-# --- TEST ---
-# --- TEST (nie zmieniaj) ---
-new_desc = test_tools[0]["function"]["description"]
-if new_desc is ... or PYTANIE is ...:
-    print("\\033[1;31m⬆️ Uzupełnij description i PYTANIE powyżej!\\033[0m")
-else:
+# --- Funkcja do testowania (nie zmieniaj) ---
+def test_1a(pytanie):
+    new_desc = test_tools[0]["function"]["description"]
+    if new_desc is ...:
+        print("\\033[1;31m⬆️ Uzupełnij description powyżej!\\033[0m")
+        return
     print(f"Nowy opis get_weather: '{new_desc}'")
     print(f"Ale nazwa to nadal:   '{test_tools[0]['function']['name']}'")
+    print(f"Pytanie: '{pytanie}'")
     print()
     if client:
         messages = [
             {"role": "system", "content":
              "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
              "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
-            {"role": "user", "content": PYTANIE}
+            {"role": "user", "content": pytanie}
         ]
         try:
             response = client.chat.completions.create(
@@ -949,7 +947,11 @@ else:
                 print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
         except Exception as e:
             print(f"\\033[1;33m⚠️ Model zwrócił błąd: {e}\\033[0m")
-            print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")\
+            print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")
+
+# ═══ TESTUJ TUTAJ — zmień pytanie i uruchom komórkę ponownie! ═══
+
+test_1a("Jaka jest pogoda w Krakowie?")\
 """))
 
 cells.append(h6_collapsed(
@@ -968,7 +970,6 @@ import copy
 
 test_tools = copy.deepcopy(tools_definition)
 test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"
-PYTANIE = "Jaka jest pogoda w Krakowie?"
 
 print(f"Nowy opis get_weather: '{test_tools[0]['function']['description']}'")
 print(f"Ale nazwa to nadal:   '{test_tools[0]['function']['name']}'")
@@ -978,7 +979,7 @@ if client:
         {"role": "system", "content":
          "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
          "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
-        {"role": "user", "content": PYTANIE}
+        {"role": "user", "content": "Jaka jest pogoda w Krakowie?"}
     ]
     try:
         response = client.chat.completions.create(
@@ -1231,13 +1232,21 @@ def get_population(city: str) -> str:
 
     pass  # Tutaj wpisz swój kod — zwróć f-string z informacjami o mieście
 
-# Krok 2: Dodaj do AVAILABLE_TOOLS
+# Krok 2: Dodaj do AVAILABLE_TOOLS (nie zmieniaj)
+AVAILABLE_TOOLS["get_population"] = get_population
 
-...  # Tutaj wpisz swój kod
+# Krok 3: Zdefiniuj model argumentów i dodaj do tools_definition
 
-# Krok 3: Dodaj definicję do tools_definition (użyj make_tool!)
+class GetPopulationArgs(BaseModel):
+    city: str = Field(..., description="Nazwa miasta, np. 'Kraków'")
 
-...  # Tutaj wpisz swój kod — potrzebujesz model Pydantic dla argumentów + make_tool()
+tools_definition.append(
+    make_tool("get_population",
+
+              ...  # Tutaj wpisz swój kod — opis narzędzia (1 zdanie, po polsku)
+
+              GetPopulationArgs)
+)
 
 # --- TEST (nie zmieniaj) ---
 _test_result = get_population("Kraków")
@@ -1320,22 +1329,46 @@ cells.append(student_stub("""\
 import wikipedia
 wikipedia.set_lang("pl")
 
-# Krok 1: Napisz funkcję
+# Biblioteka wikipedia ma 3 kluczowe funkcje:
+#   wikipedia.search("Kraków")     → lista tytułów: ["Kraków", "Kraków (ujednoznacznienie)", ...]
+#   wikipedia.page("Kraków")       → obiekt z polami: .title, .summary, .url
+#   wikipedia.summary("Kraków")    → sam tekst streszczenia (skrót od page().summary)
+#
+# Uwaga: wikipedia.page() może rzucić DisambiguationError
+# (gdy hasło jest niejednoznaczne) — złap go w try/except.
 
 def search_wikipedia(query: str) -> str:
+    \"\"\"Przeszukuje Wikipedię i zwraca tytuł + streszczenie artykułu.\"\"\"
+    results = wikipedia.search(query, results=3)
+    if not results:
+        return f"Nie znaleziono artykułów dla: {query}"
 
-    pass  # Tutaj wpisz swój kod — zwróć tytuł, streszczenie i URL jako tekst
+    try:
+        page = wikipedia.page(results[0])
+    except wikipedia.DisambiguationError as e:
+        page = wikipedia.page(e.options[0])  # bierz pierwszą opcję
 
-# Krok 2: Zarejestruj narzędzie
+    # --- TUTAJ: złóż wynik z page.title, page.summary i page.url ---
 
-...  # Tutaj wpisz swój kod — AVAILABLE_TOOLS + tools_definition.append(...)
+    return ...  # Tutaj wpisz swój kod — zwróć f-string z tytułem, streszczeniem (~500 znaków) i URL
+
+# --- Rejestracja narzędzia (nie zmieniaj) ---
+AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
+
+class SearchWikipediaArgs(BaseModel):
+    query: str = Field(..., description="Zapytanie do Wikipedii, np. 'fotosynteza', 'Nikola Tesla'")
+
+tools_definition.append(
+    make_tool("search_wikipedia",
+              "Przeszukuje Wikipedię i zwraca streszczenie artykułu. "
+              "Użyj gdy pytanie dotyczy wiedzy ogólnej, historii, nauki, geografii.",
+              SearchWikipediaArgs)
+)
 
 # --- TEST (nie zmieniaj) ---
 _test_result = search_wikipedia("Kraków")
-if _test_result is None:
-    print("\\033[1;31m⬆️ Uzupełnij funkcję search_wikipedia! Teraz zwraca None (pass).\\033[0m")
-elif "search_wikipedia" not in AVAILABLE_TOOLS:
-    print("\\033[1;31m⬆️ Dodaj search_wikipedia do AVAILABLE_TOOLS!\\033[0m")
+if _test_result is ... or _test_result is None:
+    print("\\033[1;31m⬆️ Uzupełnij return w search_wikipedia! Złóż f-string z page.title, page.summary i page.url.\\033[0m")
 else:
     print("Test bezpośredni:")
     print(search_wikipedia("Kraków"))
