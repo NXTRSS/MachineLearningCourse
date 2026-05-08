@@ -917,10 +917,15 @@ test_tools = copy.deepcopy(tools_definition)
 # --- TUTAJ ZMIEŃ description ---
 test_tools[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"
 
+# --- TUTAJ WPISZ PYTANIE (np. "Jaka jest pogoda w Krakowie?") ---
+
+PYTANIE = ...
+
 # --- TEST ---
+# --- TEST (nie zmieniaj) ---
 new_desc = test_tools[0]["function"]["description"]
-if new_desc is ... or new_desc is None or (isinstance(new_desc, str) and new_desc.strip() == ""):
-    print("\\033[1;31m⬆️ Uzupełnij description powyżej! Zamień ... na string z mylącym opisem.\\033[0m")
+if new_desc is ... or PYTANIE is ...:
+    print("\\033[1;31m⬆️ Uzupełnij description i PYTANIE powyżej!\\033[0m")
 else:
     print(f"Nowy opis get_weather: '{new_desc}'")
     print(f"Ale nazwa to nadal:   '{test_tools[0]['function']['name']}'")
@@ -930,7 +935,7 @@ else:
             {"role": "system", "content":
              "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
              "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
-            {"role": "user", "content": "Jaka jest pogoda w Krakowie?"}
+            {"role": "user", "content": PYTANIE}
         ]
         try:
             response = client.chat.completions.create(
@@ -963,6 +968,7 @@ import copy
 
 test_tools = copy.deepcopy(tools_definition)
 test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"
+PYTANIE = "Jaka jest pogoda w Krakowie?"
 
 print(f"Nowy opis get_weather: '{test_tools[0]['function']['description']}'")
 print(f"Ale nazwa to nadal:   '{test_tools[0]['function']['name']}'")
@@ -972,7 +978,7 @@ if client:
         {"role": "system", "content":
          "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
          "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
-        {"role": "user", "content": "Jaka jest pogoda w Krakowie?"}
+        {"role": "user", "content": PYTANIE}
     ]
     try:
         response = client.chat.completions.create(
@@ -1233,15 +1239,18 @@ def get_population(city: str) -> str:
 
 ...  # Tutaj wpisz swój kod — potrzebujesz model Pydantic dla argumentów + make_tool()
 
-# --- TEST ---
-try:
+# --- TEST (nie zmieniaj) ---
+_test_result = get_population("Kraków")
+if _test_result is None:
+    print("\\033[1;31m⬆️ Uzupełnij funkcję get_population! Teraz zwraca None (pass).\\033[0m")
+elif "get_population" not in AVAILABLE_TOOLS:
+    print("\\033[1;31m⬆️ Dodaj get_population do AVAILABLE_TOOLS!\\033[0m")
+else:
     print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
     print(f"\\nTest bezpośredni: {get_population('Kraków')}")
     if client:
         print()
-        ask_with_tools("Ile mieszkańców ma Kraków?")
-except (TypeError, NameError):
-    print('⬆️ Uzupełnij kod powyżej')\
+        ask_with_tools("Ile mieszkańców ma Kraków?")\
 """))
 
 cells.append(h6_collapsed(
@@ -1254,8 +1263,9 @@ cells.append(h6_collapsed(
     '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
-cells.append(md("""\
-```python
+cells.append(code("""\
+# Ćwiczenie 2 — rozwiązanie
+
 def get_population(city: str) -> str:
     dane = {
         "Warszawa": (1_860_000, 1), "Kraków": (800_000, 2), "Wrocław": (674_000, 3),
@@ -1274,7 +1284,14 @@ class GetPopulationArgs(BaseModel):
 tools_definition.append(
     make_tool("get_population", "Zwraca przybliżoną liczbę mieszkańców polskiego miasta.", GetPopulationArgs)
 )
-```"""))
+
+# --- TEST ---
+print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
+print(f"\\nTest bezpośredni: {get_population('Kraków')}")
+if client:
+    print()
+    ask_with_tools("Ile mieszkańców ma Kraków?")\
+"""))
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1313,16 +1330,19 @@ def search_wikipedia(query: str) -> str:
 
 ...  # Tutaj wpisz swój kod — AVAILABLE_TOOLS + tools_definition.append(...)
 
-# --- TEST ---
-try:
+# --- TEST (nie zmieniaj) ---
+_test_result = search_wikipedia("Kraków")
+if _test_result is None:
+    print("\\033[1;31m⬆️ Uzupełnij funkcję search_wikipedia! Teraz zwraca None (pass).\\033[0m")
+elif "search_wikipedia" not in AVAILABLE_TOOLS:
+    print("\\033[1;31m⬆️ Dodaj search_wikipedia do AVAILABLE_TOOLS!\\033[0m")
+else:
     print("Test bezpośredni:")
     print(search_wikipedia("Kraków"))
     print(f"\\nMamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
     if client:
         print("\\nTest przez LLM:")
-        ask_with_tools("Co to jest fotosynteza?")
-except (TypeError, NameError):
-    print('⬆️ Uzupełnij kod powyżej')\
+        ask_with_tools("Co to jest fotosynteza?")\
 """))
 
 cells.append(h6_collapsed(
@@ -1335,8 +1355,11 @@ cells.append(h6_collapsed(
     '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
-cells.append(md("""\
-```python
+cells.append(code("""\
+# Ćwiczenie 3 — rozwiązanie
+import wikipedia
+wikipedia.set_lang("pl")
+
 def search_wikipedia(query: str) -> str:
     try:
         results = wikipedia.search(query, results=3)
@@ -1364,7 +1387,14 @@ tools_definition.append(
               "Użyj gdy pytanie dotyczy wiedzy ogólnej, historii, nauki, geografii.",
               SearchWikipediaArgs)
 )
-```"""))
+
+# --- TEST ---
+print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
+print(f"\\nTest: {search_wikipedia('Kraków')[:200]}...")
+if client:
+    print()
+    ask_with_tools("Kim był Mikołaj Kopernik?")\
+"""))
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1563,8 +1593,15 @@ def verify_claim(claim: str) -> FactCheck:
 
     pass  # Tutaj wpisz swój kod
 
-# --- TEST ---
-try:
+# --- TEST (nie zmieniaj) ---
+_test_fc = verify_claim("test") if instructor_client else None
+if not instructor_client:
+    print("instructor_client niedostępny — pomiń to ćwiczenie.")
+elif _test_fc is None:
+    print("\\033[1;31m⬆️ Uzupełnij funkcję verify_claim! Teraz zwraca None (pass).\\033[0m")
+elif not hasattr(_test_fc, 'verdict'):
+    print("\\033[1;31m⬆️ Uzupełnij model FactCheck! Brakuje pola 'verdict'.\\033[0m")
+else:
     twierdzenia = [
         "Lech Wałęsa dostał Pokojową Nagrodę Nobla w 1983 roku",
         "Kraków jest stolicą Polski",
@@ -1576,9 +1613,7 @@ try:
         print(f"  Werdykt:  {fc.verdict} (pewność: {fc.confidence:.0%})")
         print(f"  Dowody:   {fc.evidence[:100]}")
         print(f"  Źródło:   {fc.source}")
-        print()
-except (TypeError, NameError, AttributeError):
-    print('⬆️ Uzupełnij kod powyżej')\
+        print()\
 """))
 
 cells.append(h6_collapsed(
@@ -1591,8 +1626,9 @@ cells.append(h6_collapsed(
     '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
-cells.append(md("""\
-```python
+cells.append(code("""\
+# Ćwiczenie 4 — rozwiązanie
+
 class FactCheck(BaseModel):
     claim: str = Field(..., description="Sprawdzane twierdzenie")
     evidence: str = Field(..., description="Znalezione dowody potwierdzające lub obalające")
@@ -1621,7 +1657,23 @@ def verify_claim(claim: str) -> FactCheck:
              f"Twierdzenie: {claim}\\n\\nDowody ({source}):\\n{evidence}"}
         ],
     )
-```"""))
+
+# --- TEST ---
+if instructor_client:
+    twierdzenia = [
+        "Lech Wałęsa dostał Pokojową Nagrodę Nobla w 1983 roku",
+        "Kraków jest stolicą Polski",
+    ]
+    for t in twierdzenia:
+        fc = verify_claim(t)
+        print(f"Twierdzenie: {t}")
+        print(f"  Werdykt:  {fc.verdict} (pewność: {fc.confidence:.0%})")
+        print(f"  Dowody:   {fc.evidence[:100]}...")
+        print(f"  Źródło:   {fc.source}")
+        print()
+else:
+    print("instructor_client niedostępny — pomiń to ćwiczenie.")\
+"""))
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1783,11 +1835,10 @@ cells.append(student_stub("""\
 
 MOJE_PYTANIE = ...  # Tutaj wpisz swój kod — wymyśl pytanie łączące kilka narzędzi
 
-try:
-    if client:
-        agent(MOJE_PYTANIE)
-except (TypeError, NameError):
-    print('⬆️ Wpisz swoje pytanie powyżej')\
+if MOJE_PYTANIE is ...:
+    print("\\033[1;31m⬆️ Wpisz swoje pytanie powyżej! Zamień ... na string.\\033[0m")
+elif client:
+    agent(MOJE_PYTANIE)\
 """))
 
 cells.append(h6_collapsed(
@@ -1863,11 +1914,10 @@ def my_agent(question):
                 result = f"Błąd: {e}"
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
-try:
-    if client and TEMAT != "...":
-        my_agent("Twoje pierwsze pytanie testowe")
-except (TypeError, NameError):
-    print('⬆️ Uzupełnij TEMAT i SYSTEM_PROMPT powyżej')\
+if TEMAT == "..." or SYSTEM_PROMPT == "...":
+    print("\\033[1;31m⬆️ Uzupełnij TEMAT i SYSTEM_PROMPT powyżej!\\033[0m")
+elif client:
+    my_agent("Twoje pierwsze pytanie testowe")\
 """))
 
 cells.append(h6_collapsed(
