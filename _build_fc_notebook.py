@@ -49,7 +49,7 @@ cells.append(md("""\
 
 1. **Kalkulator + pierwszy Function Call**: Zbudujemy narzędzie i od razu zobaczymy je w akcji!
 2. **Instructor**: Poznamy jak zmusić LLM-a do odpowiadania w ścisłym formacie Pydantic
-3. **Pogoda i prezydenci**: Dodamy poważniejsze narzędzia — z prawdziwym API i smart searchem
+3. **Pogoda i prezydenci**: Dodamy poważniejsze narzędzia — z prawdziwym API i bazą danych
 4. **LLM wybiera**: Zobaczmy jak LLM sam decyduje którego narzędzia użyć
 5. **Wikipedia i web search**: Podłączymy prawdziwe źródła wiedzy
 6. **Pętla agentowa**: Zbudujemy mini-agenta który sam decyduje jakie narzędzia użyć
@@ -748,104 +748,6 @@ print(f"Załadowano {len(PREZYDENCI)} prezydentów z pliku .md")
 print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzia: {list(AVAILABLE_TOOLS.keys())}")\
 """))
 
-cells.append(md("""\
-### 5b. Upgrade — "smart search" z LLM-em (context stuffing)
-
-Nasza funkcja `search_presidents` to prosty **substring search**:
-```python
-if query_lower in all_text:  # "Nobel" ≠ "Nobla" → nie znajdzie!
-```
-
-Problemy:
-- `"Nobel"` → nie znajdzie (w tekście jest *"Nobla"*)
-- `"kto zbierał monety"` → nie znajdzie (szuka całej frazy jako podciągu)
-- `"najdłużej rządził"` → nie znajdzie (w tekście jest *"najdłuższa kadencja"*)
-
-**Rozwiązanie:** wyślijmy **cały tekst** do LLM-a i pozwólmy mu odpowiedzieć **semantycznie**.
-Plik ma ~80 linii (~2000 tokenów) — mieści się w kontekście nawet najsłabszego modelu.
-
-<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
-
-**To się nazywa context stuffing** — wrzucamy cały dokument do kontekstu LLM-a zamiast
-wyszukiwać fragmenty. Działa świetnie gdy dane się mieszczą.
-
-Gdyby prezydentów było 500 a nie 7 — potrzebowalibyśmy **RAG-a z embeddingami**
-(patrz notebook o embeddingach). Ale przy małych danych — context stuffing wystarczy!
-
-</div>"""))
-
-cells.append(code("""\
-class PresidentAnswer(BaseModel):
-    answer: str = Field(..., description="Odpowiedź na pytanie, oparta o podane dane")
-    presidents_mentioned: List[str] = Field(..., description="Lista prezydentów wspomnianych w odpowiedzi")
-    confidence: float = Field(..., ge=0, le=1, description="Pewność odpowiedzi (0=zgaduję, 1=pewny)")
-
-_PRESIDENTS_RAW = Path("prezydenci_polski.md").read_text(encoding="utf-8") if Path("prezydenci_polski.md").exists() else ""
-
-
-def search_presidents_smart(query: str) -> str:
-    \"\"\"
-    Przeszukuje bazę danych o prezydentach Polski (III RP) — z rozumieniem semantycznym.
-    Rozumie synonimy, kontekst i pytania zadane własnymi słowami.
-
-    Args:
-        query: Pytanie o prezydentów, np. 'kto rządził najdłużej', 'czyje hobby to monety'
-    \"\"\"
-    if not _PRESIDENTS_RAW:
-        return "Brak danych — nie znaleziono pliku prezydenci_polski.md"
-    if not instructor_client:
-        return search_presidents(query)
-    try:
-        result = instructor_client.chat.completions.create(
-            model=MODEL_NAME,
-            response_model=PresidentAnswer,
-            messages=[
-                {"role": "system", "content":
-                 "Odpowiadasz WYŁĄCZNIE na podstawie podanych danych o prezydentach. "
-                 "Jeśli danych brak — powiedz szczerze. Nie wymyślaj. Odpowiadaj po polsku."},
-                {"role": "user", "content":
-                 f"Pytanie: {query}\\n\\nDane:\\n{_PRESIDENTS_RAW}"}
-            ],
-        )
-        return result.answer
-    except Exception:
-        return search_presidents(query)
-
-
-AVAILABLE_TOOLS["search_presidents"] = search_presidents_smart
-print("Upgrade! search_presidents → wersja smart (context stuffing)")\
-"""))
-
-cells.append(code("""\
-# Porównanie: prosty substring vs. smart LLM
-test_queries = [
-    "Nobel",                     # substring "Nobel" ≠ "Nobla"
-    "kto zbierał monety",        # semantyczne — nie ma takiej frazy w tekście
-    "najdłużej rządził",         # synonim "najdłuższa kadencja"
-    "Kwaśniewski",               # to oba znajdą
-]
-
-print("=== PROSTY (substring) vs. SMART (LLM) ===\\n")
-for q in test_queries:
-    simple = search_presidents(q)
-    simple_ok = "Nie znaleziono" not in simple
-
-    print(f"  Zapytanie: \\"{q}\\"")
-    print(f"    Prosty:  {'ZNALAZŁ' if simple_ok else 'NIE ZNALAZŁ'}")
-
-    if instructor_client:
-        smart = search_presidents_smart(q)
-        smart_ok = "Brak danych" not in smart and "error" not in smart.lower()
-        print(f"    Smart:   {'ZNALAZŁ' if smart_ok else 'NIE ZNALAZŁ'}")
-        if smart_ok:
-            import json as _j
-            try:
-                parsed = _j.loads(smart)
-                print(f"             → {parsed.get('answer', '')[:100]}...")
-            except Exception:
-                print(f"             → {smart[:100]}...")
-    print()\
-"""))
 
 # ══════════════════════════════════════════════════════════════════════
 # SEKCJA 6: JSON SCHEMA + WSZYSTKIE NARZĘDZIA + LLM WYBIERA
@@ -2053,9 +1955,6 @@ cells.append(md("""\
 3. Gdyby LLM pominął pole — instructor złapałby `ValidationError` i kazał spróbować ponownie
 
 To jest wzorzec **ETL z LLM-em**: Extract (Wikipedia) → Transform (instructor) → Load (obiekt Pydantic).
-
-W sekcji 5b (`search_presidents_smart`) zrobiliśmy to samo — wczytaliśmy cały plik `.md`
-i pozwoliliśmy LLM-owi odpowiedzieć strukturalnie. To ten sam pattern!
 
 **Kiedy to stosować?**
 - Gdy źródło danych zwraca **nieustrukturyzowany tekst** (Wikipedia, web search, PDF, email...)
