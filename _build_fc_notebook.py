@@ -94,6 +94,7 @@ ensure_package("duckduckgo-search", "duckduckgo_search")
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
+from IPython.display import display, Markdown
 import requests
 import json
 import math
@@ -276,7 +277,8 @@ def calculate_function_call(user_prompt):
 
         print()
         box("KROK 4: LLM formułuje ostateczną odpowiedź")
-        print(f"  💬 {final.choices[0].message.content}")
+        print()
+        display(Markdown(final.choices[0].message.content))
     else:
         print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
 
@@ -913,7 +915,8 @@ def ask_with_tools(question, verbose=True):
     if not assistant_msg.tool_calls:
         if verbose:
             print(f"  Narzędzie: BRAK (LLM odpowiedział sam)")
-            print(f"  💬 Odpowiedź: {assistant_msg.content[:200]}")
+            print()
+            display(Markdown(assistant_msg.content))
         return assistant_msg.content
 
     messages.append(assistant_msg)
@@ -936,7 +939,7 @@ def ask_with_tools(question, verbose=True):
 
     if verbose:
         print()
-        print(f"  💬 Odpowiedź: {final_answer[:200]}")
+        display(Markdown(final_answer))
     return final_answer
 
 print("Funkcja ask_with_tools() gotowa!")\
@@ -1718,7 +1721,8 @@ def agent(question, max_steps=6):
         if not msg.tool_calls:
             print(f"\\n  Krok {step+1}: LLM generuje odpowiedź")
             print(f"  {'─'*50}")
-            print(f"  💬 {msg.content}")
+            print()
+            display(Markdown(msg.content))
             return msg.content
 
         messages.append(msg)
@@ -1878,7 +1882,8 @@ def my_agent(question):
         msg = response.choices[0].message
 
         if not msg.tool_calls:
-            print(f"\\n  Odpowiedź: {msg.content}")
+            print()
+            display(Markdown(msg.content))
             return
 
         messages.append(msg)
