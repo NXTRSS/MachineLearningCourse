@@ -10,6 +10,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 ### Wojciech Jaruzelski
 - **Kadencja:** 1989–1990
 - **Lata życia:** 1923–2014
+- **Miejsce urodzenia:** Kurów
 - **Wiek w dniu objęcia urzędu:** 66 lat
 - **Partia:** PZPR
 - **Wykształcenie:** Wyższa Szkoła Piechoty
@@ -20,6 +21,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 ### Lech Wałęsa
 - **Kadencja:** 1990–1995
 - **Lata życia:** ur. 1943
+- **Miejsce urodzenia:** Popowo
 - **Wiek w dniu objęcia urzędu:** 47 lat
 - **Partia:** bezpartyjny (NSZZ „Solidarność")
 - **Wykształcenie:** Zasadnicza Szkoła Zawodowa (elektryk)
@@ -31,6 +33,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 ### Aleksander Kwaśniewski
 - **Kadencja:** 1995–2005
 - **Lata życia:** ur. 1954
+- **Miejsce urodzenia:** Białogard
 - **Wiek w dniu objęcia urzędu:** 41 lat
 - **Partia:** SLD (wcześniej PZPR)
 - **Wykształcenie:** Uniwersytet Gdański (ekonomia, studia nieukończone)
@@ -42,6 +45,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 ### Lech Kaczyński
 - **Kadencja:** 2005–2010
 - **Lata życia:** 1949–2010
+- **Miejsce urodzenia:** Warszawa
 - **Wiek w dniu objęcia urzędu:** 56 lat
 - **Partia:** PiS
 - **Wykształcenie:** Uniwersytet Gdański (prawo, doktor nauk prawnych)
@@ -53,6 +57,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 ### Bronisław Komorowski
 - **Kadencja:** 2010–2015
 - **Lata życia:** ur. 1952
+- **Miejsce urodzenia:** Oborniki Śląskie
 - **Wiek w dniu objęcia urzędu:** 58 lat
 - **Partia:** PO
 - **Wykształcenie:** Uniwersytet Warszawski (historia)
@@ -63,6 +68,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 ### Andrzej Duda
 - **Kadencja:** 2015–2025
 - **Lata życia:** ur. 1972
+- **Miejsce urodzenia:** Kraków
 - **Wiek w dniu objęcia urzędu:** 43 lat
 - **Partia:** PiS (formalnie bezpartyjny od objęcia urzędu)
 - **Wykształcenie:** Uniwersytet Jagielloński (prawo, doktor nauk prawnych)
@@ -74,6 +80,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 ### Karol Nawrocki
 - **Kadencja:** od 2025
 - **Lata życia:** ur. 1983
+- **Miejsce urodzenia:** Gdańsk
 - **Wiek w dniu objęcia urzędu:** 42 lat
 - **Partia:** bezpartyjny (wspierany przez PiS)
 - **Wykształcenie:** Uniwersytet Gdański (historia, doktor nauk humanistycznych)

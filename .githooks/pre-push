@@ -3,24 +3,38 @@
 # pre-push hook — automatyczne czyszczenie przed pushem na remote.
 #
 # Co robi:
-#   1. Blokuje commity z zabronionym autorem/committerem
-#   2. Zamazuje LECTURER_SERVER (prawdziwy IP:port → placeholder)
-#   3. Odpala przed_zajeciami.py (czyści outputy, resetuje stuby, zwija podpowiedzi)
-#   4. Jeśli cokolwiek się zmieniło → commituje fix i blokuje push
+#   1. Blokuje branche z zabronionym słowem w nazwie (np. "claude")
+#   2. Blokuje commity z zabronionym autorem/committerem
+#   3. Zamazuje LECTURER_SERVER (prawdziwy IP:port → placeholder)
+#   4. Odpala przed_zajeciami.py (czyści outputy, resetuje stuby, zwija podpowiedzi)
+#   5. Jeśli cokolwiek się zmieniło → commituje fix i blokuje push
 #      (żebyś zobaczył co się zmieniło i spróbował push ponownie)
 #
 # Activate with: git config core.hooksPath .githooks
 
 BLOCKED_EMAILS="kamil.jedryczek@airslate.com"
 BLOCKED_NAMES="claude"
+BLOCKED_BRANCH_PATTERNS="claude"
 PLACEHOLDER='http://ADRES_SERWERA:PORT'
 
-# ── CHECK 1: Author / committer ──────────────────────────────────────
+# ── CHECK 1: Branch name + Author / committer ───────────────────────
 
 while read local_ref local_sha remote_ref remote_sha; do
     if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
         continue
     fi
+
+    # -- Branch name --
+    ref_lower=$(echo "$local_ref" | tr '[:upper:]' '[:lower:]')
+    for pattern in $BLOCKED_BRANCH_PATTERNS; do
+        case "$ref_lower" in
+            *"$pattern"*)
+                echo "BLOCKED: branch '$local_ref' contains '$pattern'"
+                echo "Rename your branch: git branch -m <new-name>"
+                exit 1
+                ;;
+        esac
+    done
 
     if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
         range="$local_sha"
