@@ -30,6 +30,18 @@ def h6_collapsed(text):
     return cell
 
 
+def student_stub(source):
+    """Komórka z zadaniem dla studenta — przed_zajeciami.py resetuje ją do szablonu."""
+    cell = code(source)
+    cell["metadata"]["tags"] = ["student-stub"]
+    # Template = lista linii (format nbformat): każda z \n oprócz ostatniej
+    lines = source.split("\n")
+    cell["metadata"]["student_stub_template"] = [
+        line + "\n" for line in lines[:-1]
+    ] + [lines[-1]]
+    return cell
+
+
 def separator():
     return md("###### ")
 
@@ -895,7 +907,7 @@ Ale co ma większy wpływ na jego decyzję? Sprawdźmy!
 Zmień `description` narzędzia `get_weather` na coś kompletnie mylącego.
 Zadaj pytanie o pogodę i obserwuj: czy LLM się pomylił?"""))
 
-cells.append(code("""\
+cells.append(student_stub("""\
 # Ćwiczenie 1A: Zmień description get_weather na coś mylącego
 import copy
 
@@ -1204,7 +1216,7 @@ mieszkańców polskiego miasta.
 2. Funkcja zwraca **f-string** z informacjami, np. `"Kraków: ~800,000 mieszkańców (#2 w Polsce)"`
 3. Dodaj do `AVAILABLE_TOOLS` i do `tools_definition` (przez `make_tool`)"""))
 
-cells.append(code("""\
+cells.append(student_stub("""\
 # Ćwiczenie 2: Dodaj narzędzie get_population
 
 # Krok 1: Zdefiniuj funkcję
@@ -1287,7 +1299,7 @@ cells.append(md("""\
 2. Dodaj definicję narzędzia do `tools_definition` + do `AVAILABLE_TOOLS`
 3. Przetestuj pytaniem do LLM-a"""))
 
-cells.append(code("""\
+cells.append(student_stub("""\
 import wikipedia
 wikipedia.set_lang("pl")
 
@@ -1536,7 +1548,7 @@ Połączmy function calling ze Structured Output!
 - `confidence` — pewność (0-1)
 - `source` — skąd pochodzi dowód"""))
 
-cells.append(code("""\
+cells.append(student_stub("""\
 # Ćwiczenie 4: FactCheck
 
 # Krok 1: Zdefiniuj model
@@ -1766,7 +1778,7 @@ Teraz masz do dyspozycji: pogodę, kalkulator, prezydentów, Wikipedię, i web s
 
 Obserwuj jak agent krok po kroku dochodzi do odpowiedzi."""))
 
-cells.append(code("""\
+cells.append(student_stub("""\
 # Ćwiczenie 5: Twoje pytanie do agenta
 
 MOJE_PYTANIE = ...  # Tutaj wpisz swój kod — wymyśl pytanie łączące kilka narzędzi
@@ -1811,7 +1823,7 @@ Wybierz **temat** i stwórz mini-asystenta z własnymi narzędziami:
 3. Opcjonalnie: dodaj 1 nowe narzędzie specyficzne dla tematu
 4. Przetestuj 3 pytaniami"""))
 
-cells.append(code("""\
+cells.append(student_stub("""\
 # Ćwiczenie 6 (bonus): Twój asystent
 
 TEMAT = "..."  # np. "asystent podróżniczy"
