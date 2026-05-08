@@ -397,8 +397,10 @@ Od tej pory będziemy definiować narzędzia przez **modele Pydantic + `make_too
 
 # === 3b: INSTRUCTOR DEMO ===
 
-cells.append(md("""\
-### 3b. *(opcjonalne)* Instructor — Structured Output"""))
+cell_3b = md("""\
+### 3b. *(opcjonalne)* Instructor — Structured Output""")
+cell_3b["metadata"]["jp-MarkdownHeadingCollapsed"] = True
+cells.append(cell_3b)
 
 cells.append(md("""\
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
@@ -895,26 +897,42 @@ Zadaj pytanie o pogodę i obserwuj: czy LLM się pomylił?"""))
 
 cells.append(code("""\
 # Ćwiczenie 1A: Zmień description get_weather na coś mylącego
+import copy
 
-# Zapisz oryginał
-original_desc = tools_definition[0]["function"]["description"]
+# Kopia — nie modyfikujemy oryginału!
+test_tools = copy.deepcopy(tools_definition)
 
 # --- TUTAJ ZMIEŃ description ---
-tools_definition[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"
+test_tools[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"
 
 # --- TEST ---
-try:
-    print(f"Nowy opis get_weather: '{tools_definition[0]['function']['description']}'")
-    print(f"Ale nazwa to nadal:   '{tools_definition[0]['function']['name']}'")
+new_desc = test_tools[0]["function"]["description"]
+if new_desc is ... or new_desc is None or (isinstance(new_desc, str) and new_desc.strip() == ""):
+    print("\\033[1;31m⬆️ Uzupełnij description powyżej! Zamień ... na string z mylącym opisem.\\033[0m")
+else:
+    print(f"Nowy opis get_weather: '{new_desc}'")
+    print(f"Ale nazwa to nadal:   '{test_tools[0]['function']['name']}'")
     print()
     if client:
-        ask_with_tools("Jaka jest pogoda w Krakowie?")
-except (TypeError, NameError):
-    print('⬆️ Uzupełnij description powyżej')
-
-# Przywróć oryginał!
-tools_definition[0]["function"]["description"] = original_desc
-print(f"\\nPrzywrócono oryginał.")\
+        messages = [
+            {"role": "system", "content":
+             "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
+             "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
+            {"role": "user", "content": "Jaka jest pogoda w Krakowie?"}
+        ]
+        try:
+            response = client.chat.completions.create(
+                model=MODEL_NAME, messages=messages, tools=test_tools, temperature=0.1
+            )
+            msg = response.choices[0].message
+            if msg.tool_calls:
+                tc = msg.tool_calls[0]
+                print(f"  LLM wybrał: {tc.function.name}({tc.function.arguments})")
+            else:
+                print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
+        except Exception as e:
+            print(f"\\033[1;33m⚠️ Model zwrócił błąd: {e}\\033[0m")
+            print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")\
 """))
 
 cells.append(h6_collapsed(
@@ -929,20 +947,34 @@ cells.append(h6_collapsed(
 ))
 cells.append(code("""\
 # Ćwiczenie 1A — rozwiązanie
+import copy
 
-original_desc = tools_definition[0]["function"]["description"]
+test_tools = copy.deepcopy(tools_definition)
+test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"
 
-tools_definition[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"
-
-print(f"Nowy opis get_weather: '{tools_definition[0]['function']['description']}'")
-print(f"Ale nazwa to nadal:   '{tools_definition[0]['function']['name']}'")
+print(f"Nowy opis get_weather: '{test_tools[0]['function']['description']}'")
+print(f"Ale nazwa to nadal:   '{test_tools[0]['function']['name']}'")
 print()
 if client:
-    ask_with_tools("Jaka jest pogoda w Krakowie?")
-
-# Przywróć oryginał!
-tools_definition[0]["function"]["description"] = original_desc
-print(f"\\nPrzywrócono oryginał.")\
+    messages = [
+        {"role": "system", "content":
+         "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
+         "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
+        {"role": "user", "content": "Jaka jest pogoda w Krakowie?"}
+    ]
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME, messages=messages, tools=test_tools, temperature=0.1
+        )
+        msg = response.choices[0].message
+        if msg.tool_calls:
+            tc = msg.tool_calls[0]
+            print(f"  LLM wybrał: {tc.function.name}({tc.function.arguments})")
+        else:
+            print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
+    except Exception as e:
+        print(f"\\033[1;33m⚠️ Model zwrócił błąd: {e}\\033[0m")
+        print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")\
 """))
 
 cells.append(md("""\
