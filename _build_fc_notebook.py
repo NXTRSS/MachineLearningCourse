@@ -252,7 +252,13 @@ def calculate_function_call(user_prompt):
 
     tok_myslenia = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
     if tok_myslenia:
-        print(f"  🧠 Tok myślenia LLM-a: {tok_myslenia[:300]}")
+        print(f"  🧠 Tok myślenia (reasoning):")
+        for line in str(tok_myslenia)[:500].split("\\n"):
+            print(f"     {line}")
+        print()
+
+    if msg.content and msg.tool_calls:
+        print(f"  💬 LLM mówi: {msg.content[:300]}")
         print()
 
     if msg.tool_calls:
@@ -662,7 +668,7 @@ def get_weather(city: str) -> str:
 
 # Test:
 print("Test pogody:")
-print(get_weather("Kraków"))\
+print(get_weather("Wrocław"))\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
@@ -909,8 +915,14 @@ def ask_with_tools(question, verbose=True):
     if verbose:
         tok_myslenia = next((getattr(assistant_msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(assistant_msg, f, None)), None)
         if tok_myslenia:
-            print(f"  🧠 Tok myślenia: {tok_myslenia[:300]}")
+            print(f"  🧠 Tok myślenia (reasoning):")
+            for line in str(tok_myslenia)[:500].split("\\n"):
+                print(f"     {line}")
             print()
+
+    if verbose and assistant_msg.content and assistant_msg.tool_calls:
+        print(f"  💬 LLM mówi: {assistant_msg.content[:300]}")
+        print()
 
     if not assistant_msg.tool_calls:
         if verbose:
@@ -1124,7 +1136,10 @@ if client:
 
         tok = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
         if tok:
-            print(f"🧠 Tok myślenia: {tok[:300]}\\n")
+            print(f"  🧠 Tok myślenia (reasoning):")
+            for line in str(tok)[:500].split("\\n"):
+                print(f"     {line}")
+            print()
 
         if msg.tool_calls:
             tc = msg.tool_calls[0]
@@ -1716,7 +1731,13 @@ def agent(question, max_steps=6):
 
         tok_myslenia = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
         if tok_myslenia:
-            print(f"\\n  🧠 Tok myślenia: {tok_myslenia[:300]}")
+            print(f"\\n  🧠 Tok myślenia (reasoning):")
+            for line in str(tok_myslenia)[:500].split("\\n"):
+                print(f"     {line}")
+
+        if msg.content and msg.tool_calls:
+            print(f"  💬 LLM mówi: {msg.content[:300]}")
+            print()
 
         if not msg.tool_calls:
             print(f"\\n  Krok {step+1}: LLM generuje odpowiedź")
@@ -1882,8 +1903,7 @@ def my_agent(question):
         msg = response.choices[0].message
 
         if not msg.tool_calls:
-            print()
-            display(Markdown(msg.content))
+            print(f"\\n  Odpowiedź: {msg.content}")
             return
 
         messages.append(msg)
