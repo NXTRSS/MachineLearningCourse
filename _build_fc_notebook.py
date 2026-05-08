@@ -758,13 +758,22 @@ Gdyby prezydentów było 500 a nie 7 — potrzebowalibyśmy **RAG-a z embeddinga
 </div>"""))
 
 cells.append(code("""\
+# Pydantic wymusza strukturę odpowiedzi LLM-a na TRZECH poziomach:
+#
+# 1. PresidentMatch  — pojedynczy wynik (prezydent + powód + pewność TEGO dopasowania)
+# 2. PresidentAnswer — cała odpowiedź (lista wyników + ogólna pewność CAŁEGO wyszukania)
+# 3. Field(ge=0, le=1) — walidacja: confidence MUSI być 0–1, inaczej Pydantic odrzuci i instructor wymusi retry
+#
+# Dzięki temu LLM nie może zwrócić byle czego — struktura, typy i zakresy są wymuszone.
+
 class PresidentMatch(BaseModel):
     name: str = Field(..., description="Imię i nazwisko prezydenta")
     reason: str = Field(..., description="Dlaczego pasuje do zapytania (1 zdanie)")
+    confidence: float = Field(..., ge=0, le=1, description="Pewność TEGO dopasowania (0=luźne skojarzenie, 1=pewne trafienie)")
 
 class PresidentAnswer(BaseModel):
     matches: List[PresidentMatch] = Field(..., description="Prezydenci pasujący do zapytania (pusta lista jeśli nikt nie pasuje)")
-    confidence: float = Field(..., ge=0, le=1, description="Pewność odpowiedzi (0=zgaduję, 1=pewny)")
+    confidence: float = Field(..., ge=0, le=1, description="Pewność CAŁEJ odpowiedzi (0=zgaduję, 1=mam dane)")
 
 _PRESIDENTS_RAW = Path("prezydenci_polski.md").read_text(encoding="utf-8") if Path("prezydenci_polski.md").exists() else ""
 
@@ -843,9 +852,9 @@ for q in test_queries:
                 ],
             )
             smart_ok = len(result.matches) > 0
-            print(f"    Smart:   {'ZNALAZŁ' if smart_ok else 'NIE ZNALAZŁ'}  (confidence: {result.confidence:.0%})")
+            print(f"    Smart:   {'ZNALAZŁ' if smart_ok else 'NIE ZNALAZŁ'}  (pewność odpowiedzi: {result.confidence:.0%})")
             for m in result.matches:
-                print(f"             → {m.name}: {m.reason}")
+                print(f"             → {m.name} ({m.confidence:.0%}): {m.reason}")
         except Exception as e:
             print(f"    Smart:   BŁĄD ({e})")
     print()\
