@@ -49,7 +49,7 @@ cells.append(md("""\
 
 1. **Kalkulator + pierwszy Function Call**: Zbudujemy narzędzie i od razu zobaczymy je w akcji!
 2. **Instructor**: Poznamy jak zmusić LLM-a do odpowiadania w ścisłym formacie Pydantic
-3. **Pogoda i prezydenci**: Dodamy poważniejsze narzędzia — z prawdziwym API i bazą danych
+3. **Pogoda i prezydenci**: Dodamy poważniejsze narzędzia — z prawdziwym API i smart searchem
 4. **LLM wybiera**: Zobaczmy jak LLM sam decyduje którego narzędzia użyć
 5. **Wikipedia i web search**: Podłączymy prawdziwe źródła wiedzy
 6. **Pętla agentowa**: Zbudujemy mini-agenta który sam decyduje jakie narzędzia użyć
@@ -94,7 +94,6 @@ ensure_package("duckduckgo-search", "duckduckgo_search")
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
-from IPython.display import display, Markdown
 import requests
 import json
 import math
@@ -238,7 +237,9 @@ def calculate_function_call(user_prompt):
     print(f"  → Wysyłam do {MODEL_NAME}...\\n")
 
     messages = [
-        {"role": "system", "content": "Jesteś pomocnym asystentem. Odpowiadaj po polsku. Używaj narzędzi gdy to potrzebne."},
+        {"role": "system", "content":
+         "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
+         "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
         {"role": "user", "content": user_prompt}
     ]
 
@@ -250,12 +251,7 @@ def calculate_function_call(user_prompt):
 
     tok_myslenia = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
     if tok_myslenia:
-        print(f"  🧠 Tok myślenia (reasoning):")
-        for line in str(tok_myslenia)[:500].split("\\n"):
-            print(f"     {line}")
-        print()
-    if msg.content and msg.tool_calls:
-        print(f"  💬 LLM mówi: {msg.content[:300]}")
+        print(f"  🧠 Tok myślenia LLM-a: {tok_myslenia[:300]}")
         print()
 
     if msg.tool_calls:
@@ -280,8 +276,7 @@ def calculate_function_call(user_prompt):
 
         print()
         box("KROK 4: LLM formułuje ostateczną odpowiedź")
-        print()
-        display(Markdown(final.choices[0].message.content))
+        print(f"  💬 {final.choices[0].message.content}")
     else:
         print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
 
@@ -305,6 +300,14 @@ LLM: "17 razy 23 to 391"                                     ← LLM formułuje 
 ```
 
 Kluczowe: **LLM nie liczy sam** — prosi NASZ kod o obliczenie. My kontrolujemy narzędzia.
+
+</div>
+
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px; margin-top:10px;">
+
+**🧠 Tok myślenia (reasoning):** Niektóre modele (np. Qwen3) pokazują swój wewnętrzny tok myślenia
+w polu `reasoning_content`. Inne (np. Gemma) tego nie robią — to normalne!
+Wyświetlamy go gdy jest dostępny, ale jego brak nie oznacza błędu.
 
 </div>
 
@@ -386,10 +389,8 @@ Od tej pory będziemy definiować narzędzia przez **modele Pydantic + `make_too
 
 # === 3b: INSTRUCTOR DEMO ===
 
-cell_3b = md("""\
-### 3b. *(opcjonalne)* Instructor — Structured Output""")
-cell_3b["metadata"]["jp-MarkdownHeadingCollapsed"] = True
-cells.append(cell_3b)
+cells.append(md("""\
+### 3b. *(opcjonalne)* Instructor — Structured Output"""))
 
 cells.append(md("""\
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
@@ -659,7 +660,7 @@ def get_weather(city: str) -> str:
 
 # Test:
 print("Test pogody:")
-print(get_weather("Wrocław"))\
+print(get_weather("Kraków"))\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
@@ -716,7 +717,7 @@ def search_presidents(query: str) -> str:
     words = query_lower.split()
     wyniki = []
     for p in PREZYDENCI:
-        all_text = " ".join(str(v) for v in p.values()).lower()
+        all_text = " ".join(f"{k} {v}" for k, v in p.items()).lower()
         if all(w in all_text for w in words):
             lines = [f"### {p.get('imię', '?')}"]
             for key, val in p.items():
@@ -740,15 +741,103 @@ print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzia: {list(AVAILABLE_TOOLS.keys())}")
 """))
 
 cells.append(md("""\
+### 5b. Upgrade — "smart search" z LLM-em (context stuffing)
+
+Nasza funkcja `search_presidents` to prosty **substring search**:
+```python
+if query_lower in all_text:  # "Nobel" ≠ "Nobla" → nie znajdzie!
+```
+
+Problemy:
+- `"Nobel"` → nie znajdzie (w tekście jest *"Nobla"*)
+- `"kto zbierał monety"` → nie znajdzie (szuka całej frazy jako podciągu)
+- `"najdłużej rządził"` → nie znajdzie (w tekście jest *"najdłuższa kadencja"*)
+
+**Rozwiązanie:** wyślijmy **cały tekst** do LLM-a i pozwólmy mu odpowiedzieć **semantycznie**.
+Plik ma ~80 linii (~2000 tokenów) — mieści się w kontekście nawet najsłabszego modelu.
+
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
 
-**Context stuffing** — nasz `search_presidents` to prosty substring search (`if query in text`).
-Nie ogarnia synonimów ani odmiany (*"Nobel"* ≠ *"Nobla"*).
+**To się nazywa context stuffing** — wrzucamy cały dokument do kontekstu LLM-a zamiast
+wyszukiwać fragmenty. Działa świetnie gdy dane się mieszczą.
 
-Alternatywa: wrzucić **cały plik** do kontekstu LLM-a i zapytać semantycznie.
-To działa przy ~7 prezydentach (~2000 tokenów). Ale gdybyśmy mieli 500 prezydentów? Potrzebowalibyśmy **RAG-a z embeddingami** — to temat na osobny notebook!
+Gdyby prezydentów było 500 a nie 7 — potrzebowalibyśmy **RAG-a z embeddingami**
+(patrz notebook o embeddingach). Ale przy małych danych — context stuffing wystarczy!
 
 </div>"""))
+
+cells.append(code("""\
+class PresidentAnswer(BaseModel):
+    answer: str = Field(..., description="Odpowiedź na pytanie, oparta o podane dane")
+    presidents_mentioned: List[str] = Field(..., description="Lista prezydentów wspomnianych w odpowiedzi")
+    confidence: float = Field(..., ge=0, le=1, description="Pewność odpowiedzi (0=zgaduję, 1=pewny)")
+
+_PRESIDENTS_RAW = Path("prezydenci_polski.md").read_text(encoding="utf-8") if Path("prezydenci_polski.md").exists() else ""
+
+
+def search_presidents_smart(query: str) -> str:
+    \"\"\"
+    Przeszukuje bazę danych o prezydentach Polski (III RP) — z rozumieniem semantycznym.
+    Rozumie synonimy, kontekst i pytania zadane własnymi słowami.
+
+    Args:
+        query: Pytanie o prezydentów, np. 'kto rządził najdłużej', 'czyje hobby to monety'
+    \"\"\"
+    if not _PRESIDENTS_RAW:
+        return "Brak danych — nie znaleziono pliku prezydenci_polski.md"
+    if not instructor_client:
+        return search_presidents(query)
+    try:
+        result = instructor_client.chat.completions.create(
+            model=MODEL_NAME,
+            response_model=PresidentAnswer,
+            messages=[
+                {"role": "system", "content":
+                 "Odpowiadasz WYŁĄCZNIE na podstawie podanych danych o prezydentach. "
+                 "Jeśli danych brak — powiedz szczerze. Nie wymyślaj. Odpowiadaj po polsku."},
+                {"role": "user", "content":
+                 f"Pytanie: {query}\\n\\nDane:\\n{_PRESIDENTS_RAW}"}
+            ],
+        )
+        return result.answer
+    except Exception:
+        return search_presidents(query)
+
+
+AVAILABLE_TOOLS["search_presidents"] = search_presidents_smart
+print("Upgrade! search_presidents → wersja smart (context stuffing)")\
+"""))
+
+cells.append(code("""\
+# Porównanie: prosty substring vs. smart LLM
+test_queries = [
+    "Nobel",                     # substring "Nobel" ≠ "Nobla"
+    "kto zbierał monety",        # semantyczne — nie ma takiej frazy w tekście
+    "najdłużej rządził",         # synonim "najdłuższa kadencja"
+    "Kwaśniewski",               # to oba znajdą
+]
+
+print("=== PROSTY (substring) vs. SMART (LLM) ===\\n")
+for q in test_queries:
+    simple = search_presidents(q)
+    simple_ok = "Nie znaleziono" not in simple
+
+    print(f"  Zapytanie: \\"{q}\\"")
+    print(f"    Prosty:  {'ZNALAZŁ' if simple_ok else 'NIE ZNALAZŁ'}")
+
+    if instructor_client:
+        smart = search_presidents_smart(q)
+        smart_ok = "Brak danych" not in smart and "error" not in smart.lower()
+        print(f"    Smart:   {'ZNALAZŁ' if smart_ok else 'NIE ZNALAZŁ'}")
+        if smart_ok:
+            import json as _j
+            try:
+                parsed = _j.loads(smart)
+                print(f"             → {parsed.get('answer', '')[:100]}...")
+            except Exception:
+                print(f"             → {smart[:100]}...")
+    print()\
+"""))
 
 # ══════════════════════════════════════════════════════════════════════
 # SEKCJA 6: JSON SCHEMA + WSZYSTKIE NARZĘDZIA + LLM WYBIERA
@@ -802,7 +891,10 @@ def ask_with_tools(question, verbose=True):
         return None
 
     messages = [
-        {"role": "system", "content": "Jesteś pomocnym asystentem. Odpowiadaj po polsku. Używaj narzędzi gdy to potrzebne."},
+        {"role": "system", "content":
+         "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
+         "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
+         "nie próbuj odpowiadać z pamięci."},
         {"role": "user", "content": question}
     ]
 
@@ -813,51 +905,38 @@ def ask_with_tools(question, verbose=True):
     assistant_msg = response.choices[0].message
 
     if verbose:
-        # Reasoning tokens (Qwen3 → reasoning_content, inne modele → inne pola)
         tok_myslenia = next((getattr(assistant_msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(assistant_msg, f, None)), None)
         if tok_myslenia:
-            print(f"  🧠 Tok myślenia (reasoning):")
-            for line in str(tok_myslenia)[:500].split("\\n"):
-                print(f"     {line}")
-            print()
-
-        # Treść odpowiedzi (Gemma, inne modele — czasem piszą tekst OBOK tool_calls)
-        if assistant_msg.content and assistant_msg.tool_calls:
-            print(f"  💬 LLM mówi: {assistant_msg.content[:300]}")
+            print(f"  🧠 Tok myślenia: {tok_myslenia[:300]}")
             print()
 
     if not assistant_msg.tool_calls:
         if verbose:
             print(f"  Narzędzie: BRAK (LLM odpowiedział sam)")
-            print()
-            display(Markdown(assistant_msg.content))
+            print(f"  💬 Odpowiedź: {assistant_msg.content[:200]}")
         return assistant_msg.content
 
-    tool_calls = assistant_msg.tool_calls
-    if verbose and len(tool_calls) > 1:
-        print(f"  LLM wywołuje {len(tool_calls)} narzędzia naraz!")
-
     messages.append(assistant_msg)
-    for i, tool_call in enumerate(tool_calls, 1):
+    n_calls = len(assistant_msg.tool_calls)
+    for i, tool_call in enumerate(assistant_msg.tool_calls, 1):
         func_name = tool_call.function.name
         func_args = json.loads(tool_call.function.arguments)
 
+        label = f"[{i}/{n_calls}] " if n_calls > 1 else ""
         if verbose:
-            prefix = f"  [{i}/{len(tool_calls)}] " if len(tool_calls) > 1 else "  "
-            print(f"{prefix}Narzędzie: {func_name}({func_args})")
+            print(f"  {label}Narzędzie: {func_name}({func_args})")
 
         result = AVAILABLE_TOOLS.get(func_name, lambda **kw: "Nieznane narzędzie")(**func_args)
         if verbose:
-            prefix = f"  {' ' * len(f'[{i}/{len(tool_calls)}] ')}" if len(tool_calls) > 1 else "  "
-            print(f"{prefix}Wynik:     {result[:150]}")
+            print(f"  {label}Wynik:     {result[:150]}")
         messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
 
     final = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.1)
     final_answer = final.choices[0].message.content
 
     if verbose:
-        print("  Odpowiedź:\\n")
-        display(Markdown(final_answer))
+        print()
+        print(f"  💬 Odpowiedź: {final_answer[:200]}")
     return final_answer
 
 print("Funkcja ask_with_tools() gotowa!")\
@@ -887,41 +966,38 @@ else:
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-### Ćwiczenie 1: Zmień description i zobacz co się stanie
+### Ćwiczenie 1: Co ważniejsze — nazwa czy opis narzędzia?
 
-`description` w definicji narzędzia jest **jedyną wskazówką** jaką LLM ma, żeby zdecydować
-którego narzędzia użyć. Zobaczmy co się stanie, gdy go zepsujemy.
+LLM wybiera narzędzie na podstawie **nazwy** (`name`) i **opisu** (`description`).
+Ale co ma większy wpływ na jego decyzję? Sprawdźmy!
 
-**Zadanie:**
-1. Zmień `description` narzędzia `get_weather` na coś **mylącego** (np. *"Wykonuje obliczenia matematyczne"*)
-2. Uruchom komórkę poniżej
-3. Zadaj pytanie o pogodę — który tool wybierze LLM?
-4. Przywróć oryginalny description"""))
+**Część A — Zadanie: zmień opis i sprawdź efekt**
+
+Zmień `description` narzędzia `get_weather` na coś kompletnie mylącego.
+Zadaj pytanie o pogodę i obserwuj: czy LLM się pomylił?"""))
 
 cells.append(code("""\
-# Ćwiczenie 1: Zmień description jednego narzędzia i zobacz efekt
+# Ćwiczenie 1A: Zmień description get_weather na coś mylącego
 
 # Zapisz oryginał
 original_desc = tools_definition[0]["function"]["description"]
 
-# --- TUTAJ ZMIEŃ description na coś mylącego ---
+# --- TUTAJ ZMIEŃ description ---
+tools_definition[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"
 
-tools_definition[0]["function"]["description"] = ...  # Tutaj wpisz swój kod
-
-# --- KONIEC ZMIANY ---
-
+# --- TEST ---
 try:
-    print("Testuję z ZMIENIONYM description:")
-    print(f"  get_weather description: '{tools_definition[0]['function']['description']}'")
+    print(f"Nowy opis get_weather: '{tools_definition[0]['function']['description']}'")
+    print(f"Ale nazwa to nadal:   '{tools_definition[0]['function']['name']}'")
+    print()
     if client:
-        print()
         ask_with_tools("Jaka jest pogoda w Krakowie?")
 except (TypeError, NameError):
     print('⬆️ Uzupełnij description powyżej')
 
 # Przywróć oryginał!
 tools_definition[0]["function"]["description"] = original_desc
-print(f"\\nPrzywrócono oryginał: '{original_desc}'")\
+print(f"\\nPrzywrócono oryginał.")\
 """))
 
 cells.append(h6_collapsed(
@@ -929,19 +1005,223 @@ cells.append(h6_collapsed(
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
-Spróbuj np. `"Wykonuje obliczenia matematyczne"` — LLM powinien wybrać `calculate` zamiast `get_weather` gdy zapytasz o pogodę. Albo `"Szuka informacji o prezydentach"` — wtedy LLM wywoła `search_presidents`."""))
+Wpisz np.: `tools_definition[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"`"""))
 cells.append(h6_collapsed(
     '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
+cells.append(code("""\
+# Ćwiczenie 1A — rozwiązanie
+
+original_desc = tools_definition[0]["function"]["description"]
+
+tools_definition[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"
+
+print(f"Nowy opis get_weather: '{tools_definition[0]['function']['description']}'")
+print(f"Ale nazwa to nadal:   '{tools_definition[0]['function']['name']}'")
+print()
+if client:
+    ask_with_tools("Jaka jest pogoda w Krakowie?")
+
+# Przywróć oryginał!
+tools_definition[0]["function"]["description"] = original_desc
+print(f"\\nPrzywrócono oryginał.")\
+"""))
+
 cells.append(md("""\
-```python
-tools_definition[0]["function"]["description"] = "Wykonuje obliczenia matematyczne"
-```
+<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:14px; border-radius:4px;">
 
-LLM dostanie pytanie *"Jaka jest pogoda w Krakowie?"* ale widzi, że `get_weather` "wykonuje obliczenia". Więc albo wybierze `calculate` (bo myśli że to jedyne narzędzie), albo odpowie sam bez narzędzia.
+**Co zaobserwowałeś?**
 
-**Wniosek:** Jeden wyraz w description zmienia zachowanie modelu. Dlatego w produkcyjnych systemach opisy narzędzi to kluczowy element."""))
+Większość modeli **i tak wywoła `get_weather`** — bo nazwa `"get_weather"` jest zbyt silnym sygnałem!
+LLM czyta **nazwę funkcji** i na jej podstawie podejmuje decyzję, często ignorując opis.
+
+**Wniosek z części A:** Sama zmiana opisu może nie wystarczyć. Nazwa funkcji to bardzo silna wskazówka.
+
+</div>"""))
+
+cells.append(md("""\
+### Ćwiczenie 1 — Część B: Cichy błąd (najgroźniejszy rodzaj!)
+
+Skoro LLM opiera się na nazwie — ukryjmy ją! Użyjemy **neutralnych nazw** (`tool_alpha`, `tool_beta`)
+i **zamienimy opisy** dwóch funkcji, które przyjmują **ten sam typ argumentu** (`city: str`).
+
+Kluczowy trik: obie funkcje akceptują `"Kraków"` i obie zwracają sensowny wynik —
+ale **w zupełnie innym kontekście**. Nie będzie żadnego błędu, żadnego crashu.
+Będą po prostu **złe dane**."""))
+
+cells.append(code("""\
+# Ćwiczenie 1B (demo): Cichy błąd — dwie funkcje z tym samym parametrem + zamienione opisy
+
+# Pomocnicza funkcja — informacje o mieście (populacja, zabytki)
+def city_info(city: str) -> str:
+    \"\"\"Zwraca informacje o polskim mieście — populacja, zabytki, historia.\"\"\"
+    dane = {
+        "Kraków": "Kraków: ~800 tys. mieszkańców, Wawel, Sukiennice, Uniwersytet Jagielloński, stolica Małopolski.",
+        "Warszawa": "Warszawa: ~1.86 mln mieszkańców, stolica Polski, Pałac Kultury i Nauki, Stare Miasto.",
+        "Gdańsk": "Gdańsk: ~470 tys. mieszkańców, Żuraw, Stocznia Gdańska, Westerplatte, Długi Targ.",
+        "Poznań": "Poznań: ~535 tys. mieszkańców, Stary Rynek, Koziołki Poznańskie, Międzynarodowe Targi.",
+        "Wrocław": "Wrocław: ~674 tys. mieszkańców, Ostrów Tumski, krasnale, Hala Stulecia.",
+    }
+    return dane.get(city, f"Brak informacji o mieście: {city}")
+
+# Tworzymy DWA narzędzia z neutralnymi nazwami i TYM SAMYM parametrem (city)
+class CityArg(BaseModel):
+    city: str = Field(..., description="Nazwa miasta, np. 'Kraków'")
+
+weather_desc = "Sprawdza aktualną pogodę w polskim mieście — temperaturę i warunki atmosferyczne."
+city_desc    = "Zwraca informacje o polskim mieście — populacja, zabytki, historia."
+
+# Tworzymy narzędzia z NEUTRALNYMI nazwami
+tool_alpha = make_tool("tool_alpha", weather_desc, CityArg)
+tool_beta  = make_tool("tool_beta",  city_desc,    CityArg)
+
+# 🔀 SABOTAŻ: zamieniamy opisy!
+tool_alpha["function"]["description"] = city_desc     # tool_alpha WYGLĄDA jak info o mieście
+tool_beta["function"]["description"]  = weather_desc  # tool_beta  WYGLĄDA jak pogoda
+
+# Ale mapowanie do PRAWDZIWYCH funkcji zostaje oryginalne:
+sabotaged_dispatch = {
+    "tool_alpha": get_weather,  # ma opis "info o mieście" ale NAPRAWDĘ sprawdza pogodę!
+    "tool_beta":  city_info,    # ma opis "pogoda" ale NAPRAWDĘ zwraca info o mieście!
+}
+
+sabotaged_tools = [tool_alpha, tool_beta]
+
+print("Sabotaż gotowy! Oto co LLM zobaczy:\\n")
+for t in sabotaged_tools:
+    n = t["function"]["name"]
+    d = t["function"]["description"]
+    real_fn = sabotaged_dispatch[n]
+    print(f"  {n}:")
+    print(f"    Opis:             \\"{d}\\"")
+    print(f"    Prawdziwa f-ja:   {real_fn.__name__}()")
+    print()\
+"""))
+
+cells.append(code("""\
+# Ćwiczenie 1B (test): Wysyłamy pytanie — LLM widzi podmienione opisy
+
+if client:
+    for question in ["Jaka jest pogoda w Krakowie?", "Opowiedz mi o Krakowie jako mieście"]:
+        print(f"{'═'*60}")
+        print(f"Pytanie: \\"{question}\\"\\n")
+
+        messages = [
+            {"role": "system", "content":
+             "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
+             "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
+            {"role": "user", "content": question}
+        ]
+
+        response = client.chat.completions.create(
+            model=MODEL_NAME, messages=messages, tools=sabotaged_tools, temperature=0.1
+        )
+        msg = response.choices[0].message
+
+        tok = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
+        if tok:
+            print(f"🧠 Tok myślenia: {tok[:300]}\\n")
+
+        if msg.tool_calls:
+            tc = msg.tool_calls[0]
+            chosen_name = tc.function.name
+            chosen_args = json.loads(tc.function.arguments)
+            real_func = sabotaged_dispatch[chosen_name]
+
+            print(f"  LLM wybrał:        {chosen_name}({chosen_args})")
+            print(f"  Prawdziwa funkcja:  {real_func.__name__}()")
+
+            result = real_func(**chosen_args)
+            print(f"  Wynik:             \\"{result}\\"")
+            print()
+
+            # Analiza
+            if "pogoda" in question.lower():
+                if real_func.__name__ == "get_weather":
+                    print("  ✅ Poprawnie! Dostaliśmy pogodę.")
+                else:
+                    print("  🤦 CICHY BŁĄD! Pytaliśmy o pogodę, a dostaliśmy info o mieście.")
+                    print("     Żadnego errora — funkcja się wykonała, wynik wygląda sensownie.")
+                    print("     Ale to NIE jest pogoda!")
+            else:
+                if real_func.__name__ == "city_info":
+                    print("  ✅ Poprawnie! Dostaliśmy info o mieście.")
+                else:
+                    print("  🤦 CICHY BŁĄD! Pytaliśmy o miasto, a dostaliśmy pogodę.")
+                    print("     Żadnego errora — ale odpowiedź jest kompletnie nie na temat!")
+        else:
+            print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
+        print()
+else:
+    print("LLM niedostępny.")\
+"""))
+
+cells.append(md("""\
+<div style="background:#f8d7da; border-left:4px solid #dc3545; padding:14px; border-radius:4px;">
+
+**Cichy błąd jest GORSZY od crashu!**
+
+Gdyby funkcja się wysypała — zobaczylibyśmy `Error` i wiedzielibyśmy, że coś nie gra.
+Ale tutaj **wszystko wygląda OK**: funkcja się wykonała, wynik jest poprawny gramatycznie,
+nie ma żadnego ostrzeżenia. Jedyny problem? **Dane są kompletnie nie te.**
+
+W produkcyjnych systemach to prowadzi do:
+- Chatbot podaje złe informacje z przekonaniem
+- Agent wykonuje niewłaściwą akcję (np. kasuje plik zamiast go wyszukać)
+- Użytkownik nie wie, że odpowiedź jest błędna
+
+**Dlatego nazwy i opisy narzędzi to krytyczny element bezpieczeństwa AI systemów!**
+
+</div>"""))
+
+# ── FAŁSZYWE DANE W ŹRÓDLE ──
+
+cells.append(md("""\
+### Fałszywe dane w źródle — *"garbage in, garbage out"*
+
+Cichy błąd może wynikać nie tylko z podmienionego opisu narzędzia.
+Nawet gdy LLM wybierze **właściwą** funkcję — wynik jest tak dobry jak **dane źródłowe**.
+
+W naszym pliku `prezydenci_polski.md` ukryliśmy dwa **całkowicie zmyślone** "mało znane fakty".
+Sprawdźmy, czy LLM zwróci je z pełnym przekonaniem:"""))
+
+cells.append(code("""\
+# Zapytajmy o "mało znane fakty" — co zwróci nasz system?
+
+for q in ["mało znany fakt", "kolekcjoner monet"]:
+    print(f"Zapytanie: '{q}'")
+    print(f"{search_presidents(q)}")
+    print()\
+"""))
+
+cells.append(md("""\
+<div style="background:#f8d7da; border-left:4px solid #dc3545; padding:14px; border-radius:4px;">
+
+**Oba te "fakty" są całkowicie ZMYŚLONE!**
+
+- Kwaśniewski **nie miał** żadnego popiersia Kleopatry od ambasadora Egiptu
+- Duda **nie kolekcjonuje** antycznych monet z czasów Juliusza Cezara
+
+A mimo to nasz system zwrócił je jako prawdziwe dane.
+LLM nie ma jak sprawdzić czy źródło jest rzetelne — przekaże dalej wszystko co dostanie.
+
+</div>
+
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px; margin-top:10px;">
+
+**Wnioski z Ćwiczenia 1:**
+
+| Źródło błędu | Efekt | Wykrywalność |
+|---|---|---|
+| Zły opis narzędzia (ale znana nazwa) | LLM i tak trafia | Żaden — nam się udało! |
+| Podmienione nazwy + opisy | **Cichy błąd** — złe narzędzie, dane nie na temat | Trudna — trzeba sprawdzić |
+| Fałszywe dane w źródle | **Cichy błąd** — prawidłowe narzędzie, ale kłamstwo w danych | Bardzo trudna! |
+
+Dlatego w produkcyjnych systemach AI kluczowe są:
+**dobre opisy narzędzi** + **weryfikacja danych źródłowych** + **testy jakości odpowiedzi**
+
+</div>"""))
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
@@ -954,7 +1234,23 @@ cells.append(md("""\
 Stwórz nową funkcję i dodaj jej opis do `tools_definition`.
 
 **Zadanie:** Napisz narzędzie `get_population(city)` które zwraca przybliżoną liczbę
-mieszkańców polskiego miasta jako zwykły tekst (f-string)."""))
+mieszkańców polskiego miasta.
+
+**Dane do użycia** (GUS 2024):
+
+| Miasto | Mieszkańcy | Ranking |
+|---|---|---|
+| Warszawa | ~1 860 000 | #1 |
+| Kraków | ~800 000 | #2 |
+| Wrocław | ~674 000 | #3 |
+| Łódź | ~646 000 | #4 |
+| Poznań | ~535 000 | #5 |
+| Gdańsk | ~470 000 | #6 |
+
+**Jak to zrobić:**
+1. Przechowaj dane w **słowniku** `dict` — klucz to nazwa miasta, wartość to **tupla** `(populacja, ranking)`
+2. Funkcja zwraca **f-string** z informacjami, np. `"Kraków: ~800,000 mieszkańców (#2 w Polsce)"`
+3. Dodaj do `AVAILABLE_TOOLS` i do `tools_definition` (przez `make_tool`)"""))
 
 cells.append(code("""\
 # Ćwiczenie 2: Dodaj narzędzie get_population
@@ -998,8 +1294,8 @@ cells.append(md("""\
 ```python
 def get_population(city: str) -> str:
     dane = {
-        "Warszawa": (1_860_000, 1), "Kraków": (800_000, 2), "Wrocław": (670_000, 4),
-        "Gdańsk": (470_000, 6), "Poznań": (535_000, 5), "Łódź": (660_000, 3),
+        "Warszawa": (1_860_000, 1), "Kraków": (800_000, 2), "Wrocław": (674_000, 3),
+        "Gdańsk": (470_000, 6), "Poznań": (535_000, 5), "Łódź": (646_000, 4),
     }
     if city in dane:
         pop, rank = dane[city]
@@ -1399,9 +1695,9 @@ def agent(question, max_steps=6):
     messages = [
         {"role": "system", "content":
          "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
-         "Używaj narzędzi aby znaleźć potrzebne informacje. "
-         "Możesz wywołać wiele narzędzi po kolei. "
-         "Jeśli pytanie dotyczy prezydentów Polski — ZAWSZE sprawdź narzędzie search_presidents."},
+         "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
+         "nie próbuj odpowiadać z pamięci. "
+         "Możesz wywołać wiele narzędzi po kolei."},
         {"role": "user", "content": question}
     ]
 
@@ -1415,17 +1711,14 @@ def agent(question, max_steps=6):
 
         msg = response.choices[0].message
 
-        # Pokaż reasoning / content jeśli model je generuje
-        tok = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
-        if tok:
-            print(f"\\n  🧠 Reasoning: {str(tok)[:300]}")
-        if msg.content and msg.tool_calls:
-            print(f"  💬 LLM mówi: {msg.content[:300]}")
+        tok_myslenia = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
+        if tok_myslenia:
+            print(f"\\n  🧠 Tok myślenia: {tok_myslenia[:300]}")
 
         if not msg.tool_calls:
             print(f"\\n  Krok {step+1}: LLM generuje odpowiedź")
-            print(f"  {'─'*50}\\n")
-            display(Markdown(msg.content))
+            print(f"  {'─'*50}")
+            print(f"  💬 {msg.content}")
             return msg.content
 
         messages.append(msg)
@@ -1585,8 +1878,7 @@ def my_agent(question):
         msg = response.choices[0].message
 
         if not msg.tool_calls:
-            print(f"\\n  Odpowiedź:\\n")
-            display(Markdown(msg.content))
+            print(f"\\n  Odpowiedź: {msg.content}")
             return
 
         messages.append(msg)
@@ -1736,6 +2028,9 @@ cells.append(md("""\
 3. Gdyby LLM pominął pole — instructor złapałby `ValidationError` i kazał spróbować ponownie
 
 To jest wzorzec **ETL z LLM-em**: Extract (Wikipedia) → Transform (instructor) → Load (obiekt Pydantic).
+
+W sekcji 5b (`search_presidents_smart`) zrobiliśmy to samo — wczytaliśmy cały plik `.md`
+i pozwoliliśmy LLM-owi odpowiedzieć strukturalnie. To ten sam pattern!
 
 **Kiedy to stosować?**
 - Gdy źródło danych zwraca **nieustrukturyzowany tekst** (Wikipedia, web search, PDF, email...)
