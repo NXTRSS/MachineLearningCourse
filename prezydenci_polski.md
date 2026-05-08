@@ -25,6 +25,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 - **Wykształcenie:** Zasadnicza Szkoła Zawodowa (elektryk)
 - **Poprzedni urząd:** Przewodniczący NSZZ „Solidarność"
 - **Kluczowe wydarzenia:** Laureat Pokojowej Nagrody Nobla (1983). Pierwszy prezydent wybrany w wolnych wyborach powszechnych. Odebrał insygnia prezydenckie od rządu RP na uchodźstwie (Ryszard Kaczorowski).
+- **Nagrody międzynarodowe:** Pokojowa Nagroda Nobla (1983) — za walkę o prawa pracownicze metodami pokojowymi. Jedna z najważniejszych nagród międzynarodowych przyznanych Polakowi.
 - **Długość kadencji:** 1826 dni
 
 ### Aleksander Kwaśniewski
@@ -46,6 +47,7 @@ Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 - **Wykształcenie:** Uniwersytet Gdański (prawo, doktor nauk prawnych)
 - **Poprzedni urząd:** Prezydent Warszawy
 - **Kluczowe wydarzenia:** Brat bliźniak Jarosława Kaczyńskiego (premiera). Zginął w katastrofie lotniczej pod Smoleńskiem 10 kwietnia 2010 roku. Razem z nim zginęło 95 osób, w tym najwyżsi przedstawiciele państwa. Lecieli na obchody 70. rocznicy zbrodni katyńskiej.
+- **Nagrody międzynarodowe:** Bohater Narodowy Gruzji (tytuł nadany pośmiertnie w 2010). Poleciał do Tbilisi podczas wojny rosyjsko-gruzińskiej w 2008 roku, aby osobiście wesprzeć Gruzję — jeden z nielicznych przywódców, którzy to zrobili.
 - **Długość kadencji:** 1631 dni (kadencja przerwana)
 
 ### Bronisław Komorowski

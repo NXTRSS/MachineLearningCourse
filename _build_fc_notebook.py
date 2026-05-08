@@ -105,8 +105,9 @@ print("Pakiety załadowane!")\
 
 # === LLM AUTO-DETECT ===
 cells.append(md("""\
-## 2. Połączenie z LLM-em
+## 2. Połączenie z LLM-em"""))
 
+cells.append(md("""\
 Poniższa komórka automatycznie szuka działającego LLM-a. Zanim ją uruchomisz:
 
 <div style="background:#fff3cd; border-left:4px solid #ffc107; padding:12px; border-radius:4px;">
@@ -161,8 +162,9 @@ print(f"Nadpisano! Używam: {MODEL_NAME}")\
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 3. Kalkulator — twoje pierwsze narzędzie + Function Call!
+## 3. Kalkulator — twoje pierwsze narzędzie + Function Call!"""))
 
+cells.append(md("""\
 Zacznijmy od **najprostszego** możliwego narzędzia — kalkulatora.
 Zobaczymy **cały cykl Function Calling** krok po kroku."""))
 
@@ -189,8 +191,9 @@ print(calculate("2 ** 10"))\
 """))
 
 cells.append(md("""\
-### Pierwszy Function Call — pod maską!
+### Pierwszy Function Call — pod maską!"""))
 
+cells.append(md("""\
 Mamy narzędzie. Teraz **opiszemy** je dla LLM-a (w formacie JSON Schema)
 i wyślemy pytanie. LLM **sam zdecyduje** czy potrzebuje kalkulatora.
 
@@ -216,9 +219,12 @@ calc_tool = {
     }
 }
 
-user_question = "Ile to jest 17 razy 23?"
+def calculate_function_call(user_prompt):
+    \"\"\"Pełny cykl Function Calling: pytanie → LLM → narzędzie → odpowiedź.\"\"\"
+    if not client:
+        print("LLM niedostępny — uruchom LM Studio lub Ollamę.")
+        return
 
-if client:
     W = 60
     def box(text):
         print("╔" + "═"*W + "╗")
@@ -226,13 +232,13 @@ if client:
         print("╚" + "═"*W + "╝")
 
     box("KROK 1: Wysyłamy pytanie + opis narzędzia do LLM-a")
-    print(f"\\n  Pytanie: \\"{user_question}\\"")
+    print(f"\\n  Pytanie: \\"{user_prompt}\\"")
     print(f"  Narzędzie: calculate — {calc_tool['function']['description']}")
     print(f"  → Wysyłam do {MODEL_NAME}...\\n")
 
     messages = [
         {"role": "system", "content": "Jesteś pomocnym asystentem. Odpowiadaj po polsku. Używaj narzędzi gdy to potrzebne."},
-        {"role": "user", "content": user_question}
+        {"role": "user", "content": user_prompt}
     ]
 
     response = client.chat.completions.create(
@@ -271,8 +277,9 @@ if client:
         print(f"  {final.choices[0].message.content}")
     else:
         print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
-else:
-    print("LLM niedostępny — uruchom LM Studio lub Ollamę.")\
+
+# --- Uruchomienie ---
+calculate_function_call("Ile to jest 17 razy 23?")\
 """))
 
 cells.append(md("""\
@@ -372,9 +379,12 @@ Od tej pory będziemy definiować narzędzia przez **modele Pydantic + `make_too
 
 # === 3b: INSTRUCTOR DEMO ===
 
-cells.append(md("""\
-### 3b. *(opcjonalne)* Instructor — Structured Output
+cell_3b = md("""\
+### 3b. *(opcjonalne)* Instructor — Structured Output""")
+cell_3b["metadata"]["jp-MarkdownHeadingCollapsed"] = True
+cells.append(cell_3b)
 
+cells.append(md("""\
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
 Ta sekcja pokazuje <b>drugi</b> sposób użycia Pydantic z LLM-em. Nie jest wymagana do dalszej pracy
 z Function Calling — możesz ją pominąć i wrócić później.
@@ -395,8 +405,8 @@ Ale jest też odwrotny kierunek: zmusić LLM-a żeby **odpowiedział** w formaci
 Biblioteka **`instructor`** opakowuje klienta OpenAI i dodaje parametr `response_model=`.
 
 ```
-Bez instructor:   LLM → "Kraków to miasto w Małopolsce, ma ok. 800 tys. mieszkańców..."  (tekst)
-Z instructor:     LLM → CityInfo(name="Kraków", population=800000, region="Małopolska")   (obiekt!)
+Bez instructor:   LLM → "Wrocław to miasto na Dolnym Śląsku, ma ok. 670 tys. mieszkańców..."  (tekst)
+Z instructor:     LLM → CityInfo(name="Wrocław", population=670000, region="Dolny Śląsk")   (obiekt!)
 ```
 
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
@@ -422,7 +432,7 @@ if instructor_client:
     city = instructor_client.chat.completions.create(
         model=MODEL_NAME,
         response_model=CityInfo,
-        messages=[{"role": "user", "content": "Opowiedz o Krakowie"}],
+        messages=[{"role": "user", "content": "Opowiedz o Wrocławiu"}],
     )
     print(f"Typ wyniku: {type(city).__name__}")
     print(f"\\nPola:")
@@ -436,8 +446,9 @@ else:
 """))
 
 cells.append(md("""\
-#### Co się stanie gdy pytanie nie pasuje do modelu?
+#### Co się stanie gdy pytanie nie pasuje do modelu?"""))
 
+cells.append(md("""\
 LLM **musi** wypełnić wszystkie pola — nawet gdy pytanie dotyczy czegoś zupełnie innego.
 Zobaczmy co się stanie gdy zapytamy o smak lodów, a model wymaga danych o mieście:"""))
 
@@ -454,6 +465,7 @@ class MaybeCityInfo(BaseModel):
 
 test_questions = [
     "Opowiedz o Gdańsku",
+    "Opowiedz o Chrząszczyżewoszycach",
     "Jaki jest najlepszy smak lodów?",
     "Ile nóg ma pająk?",
 ]
@@ -470,7 +482,7 @@ if instructor_client:
             print(f"  ✓ Znaleziono: {result.name} ({result.country}), {result.population_approx:_} mieszkańców")
             print(f"    Znane z: {result.famous_for}")
         else:
-            print(f"  ✗ Nie dotyczy miasta: {result.error_message}")
+            print(f"  ✗ Brak ustrukturyzowanej odpowiedzi — LLM: {result.error_message}")
 else:
     print("instructor_client niedostępny.")\
 """))
@@ -541,7 +553,7 @@ print("🔬 Demo: psujemy JSON + podglądamy retry!\\n")
 city = _sabotaged_ic.chat.completions.create(
     model=MODEL_NAME,
     response_model=CityRetryDemo,
-    messages=[{"role": "user", "content": "Opowiedz o Krakowie"}],
+    messages=[{"role": "user", "content": "Opowiedz o Wrocławiu"}],
     max_retries=3,
 )
 print(f"  ✅ Sukces! {city.name}, {city.country}, {city.population_approx:,}")
@@ -565,8 +577,9 @@ gdy LLM zwróci niepoprawny format. To Twoja siatka bezpieczeństwa! 🛡️
 </div>"""))
 
 cells.append(md("""\
-#### Function Calling vs. Structured Output — dwa różne mechanizmy!
+#### Function Calling vs. Structured Output — dwa różne mechanizmy!"""))
 
+cells.append(md("""\
 <div style="background:#fff3cd; border-left:4px solid #ffc107; padding:14px; border-radius:4px;">
 
 | | **Function Calling** (`client`) | **Structured Output** (`instructor_client`) |
@@ -587,8 +600,9 @@ cells.append(md("""\
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 4. Pogoda — prawdziwe API + fallback
+## 4. Pogoda — prawdziwe API + fallback"""))
 
+cells.append(md("""\
 Kalkulator pokazał nam cały cykl FC. Teraz zbudujemy **poważniejsze narzędzie**
 — pobierające prawdziwą pogodę z API [wttr.in](https://wttr.in).
 
@@ -638,7 +652,7 @@ def get_weather(city: str) -> str:
 
 # Test:
 print("Test pogody:")
-print(get_weather("Kraków"))\
+print(get_weather("Wrocław"))\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
@@ -744,9 +758,12 @@ Gdyby prezydentów było 500 a nie 7 — potrzebowalibyśmy **RAG-a z embeddinga
 </div>"""))
 
 cells.append(code("""\
+class PresidentMatch(BaseModel):
+    name: str = Field(..., description="Imię i nazwisko prezydenta")
+    reason: str = Field(..., description="Dlaczego pasuje do zapytania (1 zdanie)")
+
 class PresidentAnswer(BaseModel):
-    answer: str = Field(..., description="Odpowiedź na pytanie, oparta o podane dane")
-    presidents_mentioned: List[str] = Field(..., description="Lista prezydentów wspomnianych w odpowiedzi")
+    matches: List[PresidentMatch] = Field(..., description="Prezydenci pasujący do zapytania (pusta lista jeśli nikt nie pasuje)")
     confidence: float = Field(..., ge=0, le=1, description="Pewność odpowiedzi (0=zgaduję, 1=pewny)")
 
 _PRESIDENTS_RAW = Path("prezydenci_polski.md").read_text(encoding="utf-8") if Path("prezydenci_polski.md").exists() else ""
@@ -771,12 +788,15 @@ def search_presidents_smart(query: str) -> str:
             messages=[
                 {"role": "system", "content":
                  "Odpowiadasz WYŁĄCZNIE na podstawie podanych danych o prezydentach. "
-                 "Jeśli danych brak — powiedz szczerze. Nie wymyślaj. Odpowiadaj po polsku."},
+                 "Jeśli pasuje więcej niż jeden prezydent — wymień WSZYSTKICH. "
+                 "Jeśli danych brak — zwróć pustą listę. Nie wymyślaj. Odpowiadaj po polsku."},
                 {"role": "user", "content":
                  f"Pytanie: {query}\\n\\nDane:\\n{_PRESIDENTS_RAW}"}
             ],
         )
-        return result.answer
+        if not result.matches:
+            return "Nie znaleziono pasujących prezydentów."
+        return "\\n".join(f"- {m.name}: {m.reason}" for m in result.matches)
     except Exception:
         return search_presidents(query)
 
@@ -788,9 +808,13 @@ print("Upgrade! search_presidents → wersja smart (context stuffing)")\
 cells.append(code("""\
 # Porównanie: prosty substring vs. smart LLM
 test_queries = [
-    "Nobel",                     # substring "Nobel" ≠ "Nobla"
+    "Nobel",                     # odmiana: "Nobel" ≠ "Nobla" w tekście
+    "Międzynarodowa nagroda",    # peryfraza — trzeba skojarzyć z Noblem
     "kto zbierał monety",        # semantyczne — nie ma takiej frazy w tekście
     "najdłużej rządził",         # synonim "najdłuższa kadencja"
+    "związkowiec",               # w tekście jest "NSZZ Solidarność", nie "związkowiec"
+    "wojskowy",                  # w tekście "Wyższa Szkoła Piechoty", nie "wojskowy"
+    "zginął tragicznie",         # w tekście "katastrofa smoleńska", nie "zginął"
     "Kwaśniewski",               # to oba znajdą
 ]
 
@@ -801,18 +825,29 @@ for q in test_queries:
 
     print(f"  Zapytanie: \\"{q}\\"")
     print(f"    Prosty:  {'ZNALAZŁ' if simple_ok else 'NIE ZNALAZŁ'}")
+    if simple_ok:
+        print(f"             {simple[:150]}...")
 
     if instructor_client:
-        smart = search_presidents_smart(q)
-        smart_ok = "Brak danych" not in smart and "error" not in smart.lower()
-        print(f"    Smart:   {'ZNALAZŁ' if smart_ok else 'NIE ZNALAZŁ'}")
-        if smart_ok:
-            import json as _j
-            try:
-                parsed = _j.loads(smart)
-                print(f"             → {parsed.get('answer', '')[:100]}...")
-            except Exception:
-                print(f"             → {smart[:100]}...")
+        try:
+            result = instructor_client.chat.completions.create(
+                model=MODEL_NAME,
+                response_model=PresidentAnswer,
+                messages=[
+                    {"role": "system", "content":
+                     "Odpowiadasz WYŁĄCZNIE na podstawie podanych danych o prezydentach. "
+                     "Jeśli pasuje więcej niż jeden prezydent — wymień WSZYSTKICH. "
+                     "Jeśli danych brak — zwróć pustą listę. Nie wymyślaj. Odpowiadaj po polsku."},
+                    {"role": "user", "content":
+                     f"Pytanie: {q}\\n\\nDane:\\n{_PRESIDENTS_RAW}"}
+                ],
+            )
+            smart_ok = len(result.matches) > 0
+            print(f"    Smart:   {'ZNALAZŁ' if smart_ok else 'NIE ZNALAZŁ'}  (confidence: {result.confidence:.0%})")
+            for m in result.matches:
+                print(f"             → {m.name}: {m.reason}")
+        except Exception as e:
+            print(f"    Smart:   BŁĄD ({e})")
     print()\
 """))
 
@@ -1793,8 +1828,9 @@ i pozwoliliśmy LLM-owi odpowiedzieć strukturalnie. To ten sam pattern!
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 11. Podsumowanie
+## 11. Podsumowanie"""))
 
+cells.append(md("""\
 ### Co zrobiliśmy?
 
 1. **Pydantic + instructor** — ustrukturyzowane dane, JSON Schema, walidacja + LLM odpowiada jako obiekt Pythona
