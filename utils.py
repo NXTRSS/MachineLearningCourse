@@ -621,7 +621,7 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
-def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
+def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None):
     """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
     Kolejność prób:
@@ -629,6 +629,12 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
       2. Auto-launch LM Studio (jeśli `lms` w PATH)
       3. Ollama lokalna (port 11434)
       4. Serwer prowadzącego — próbuje LM Studio, potem Ollama
+
+    Args:
+        lecturer_server: adres serwera prowadzącego (fallback gdy brak lokalnego LLM-a)
+        model: opcjonalny override — partial-match nazwy modelu (np. "gemma"
+               wybierze pierwszy dostępny model z "gemma" w nazwie). Domyślnie
+               None = automatyczny wybór najmocniejszego dostępnego.
 
     Zwraca:
         client           — do function calling (tools=)
@@ -649,6 +655,15 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
             instr = None
         return client, instr, model
 
+    def _pick(models):
+        """Wybiera model: najpierw override (partial match), potem auto."""
+        if model:
+            match = next((m for m in models if model.lower() in m.lower()), None)
+            if match:
+                return match
+            print(f"  ⚠️ Nie znaleziono '{model}' — wybieram automatycznie")
+        return pick_best_model(models) or models[0]
+
     # 1) LM Studio lokalne — domyślny port + port z lecturer_server
     lms_ports = [1234]
     try:
@@ -666,17 +681,17 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
         if not models and port == 1234:
             models = _try_launch_lms() and detect_lmstudio(url)
         if models:
-            model = pick_best_model(models) or models[0]
-            print(f"✓ LM Studio (port {port})! Model: {model}")
-            return _make_clients(url, "lm-studio", model)
+            picked = _pick(models)
+            print(f"✓ LM Studio (port {port})! Model: {picked}")
+            return _make_clients(url, "lm-studio", picked)
 
     # 2) Ollama lokalna
     print("  LM Studio niedostępne.\nSzukam lokalnej Ollamy (port 11434)...")
     models = detect_ollama()
     if models:
-        model = pick_best_model(models)
-        print(f"✓ Lokalna Ollama! Model: {model}")
-        return _make_clients("http://localhost:11434", "ollama", model)
+        picked = _pick(models)
+        print(f"✓ Lokalna Ollama! Model: {picked}")
+        return _make_clients("http://localhost:11434", "ollama", picked)
 
     # 3) Serwer prowadzącego — próbuj LM Studio, potem Ollama
     _is_placeholder = not lecturer_server or "ADRES_SERWERA" in lecturer_server
@@ -686,17 +701,17 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT"):
         # 3a) LM Studio na serwerze prowadzącego
         models = detect_lmstudio(lecturer_server)
         if models:
-            model = pick_best_model(models) or models[0]
-            print(f"✓ Serwer prowadzącego (LM Studio)! Model: {model}")
-            return _make_clients(lecturer_server, "lm-studio", model)
+            picked = _pick(models)
+            print(f"✓ Serwer prowadzącego (LM Studio)! Model: {picked}")
+            return _make_clients(lecturer_server, "lm-studio", picked)
 
         # 3b) Ollama na serwerze prowadzącego (inny port?)
         #     Spróbuj ten sam adres ale z endpointem Ollamy
         models = detect_ollama(lecturer_server)
         if models:
-            model = pick_best_model(models)
-            print(f"✓ Serwer prowadzącego (Ollama)! Model: {model}")
-            return _make_clients(lecturer_server, "ollama", model)
+            picked = _pick(models)
+            print(f"✓ Serwer prowadzącego (Ollama)! Model: {picked}")
+            return _make_clients(lecturer_server, "ollama", picked)
 
     print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
     return None, None, None
