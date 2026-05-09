@@ -1643,17 +1643,31 @@ class FactCheck(BaseModel):
 # --- verify_claim() jest gotowa — nie zmieniaj ---
 
 def verify_claim(claim: str) -> FactCheck:
-    # Szukamy dowodów — najpierw w bazie prezydentów, potem na Wikipedii.
-    # Uwaga: szukamy po NAZWISKU, nie pełnym zdaniem — inaczej search nie znajdzie.
-    # Wyciągamy kluczowe słowa z twierdzenia (imiona, nazwiska, tematy).
-    search_query = claim
+    # ── Krok 1: Function Calling — LLM wybiera narzędzie i strukturyzuje zapytanie ──
+    # Nie szukamy pełnym zdaniem! LLM sam wyciąga kluczowe słowa
+    # (np. "Lech Wałęsa dostał Nobla w 1983" → search_presidents("Wałęsa Nobel"))
+    messages = [
+        {"role": "system", "content":
+         "Znajdź dowody na temat tego twierdzenia. Użyj dostępnych narzędzi. "
+         "ZAWSZE użyj narzędzia — nie odpowiadaj z pamięci."},
+        {"role": "user", "content": claim}
+    ]
+    response = client.chat.completions.create(
+        model=MODEL_NAME, messages=messages, tools=tools_definition, temperature=0.1
+    )
+    msg = response.choices[0].message
 
-    evidence = search_presidents(search_query)
-    source = "baza prezydentów"
-    if "Nie znaleziono" in evidence:
-        evidence = search_wikipedia(search_query)
-        source = "Wikipedia"
+    # Wykonaj tool call jeśli LLM go wybrał
+    evidence = "Brak dowodów — LLM nie użył narzędzia."
+    source = "brak"
+    if msg.tool_calls:
+        tc = msg.tool_calls[0]
+        func_name = tc.function.name
+        func_args = json.loads(tc.function.arguments)
+        evidence = AVAILABLE_TOOLS.get(func_name, lambda **kw: "Nieznane narzędzie")(**func_args)
+        source = func_name
 
+    # ── Krok 2: Structured Output — instructor formatuje werdykt ──
     # instructor wymusza, żeby LLM odpowiedział DOKŁADNIE w formacie FactCheck.
     # Jeśli LLM pominie pole, instructor automatycznie ponawia z feedbackiem.
     # Hint "PŁASKIM JSON-em" to workaround na mniejsze modele (np. Gemma),
@@ -1667,7 +1681,7 @@ def verify_claim(claim: str) -> FactCheck:
              "Jeśli dowody nie wystarczają, powiedz 'nie da się zweryfikować'. Bądź uczciwy. "
              "Odpowiedz PŁASKIM JSON-em — NIE owijaj w 'properties'."},
             {"role": "user", "content":
-             f"Twierdzenie: {claim}\\n\\nDowody ({source}):\\n{evidence}"}
+             f"Twierdzenie: {claim}\\n\\nDowody (źródło: {source}):\\n{evidence}"}
         ],
     )
 
