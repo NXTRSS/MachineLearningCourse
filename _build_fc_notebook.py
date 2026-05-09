@@ -1503,12 +1503,12 @@ print(result[:300] + "..." if len(result) > 300 else result)\
 """))
 
 cells.append(md("""\
-Sprawdźmy, czy LLM wybierze `search_web` zamiast `search_wikipedia` — pytamy o coś **aktualnego**:"""))
+Sprawdźmy, czy LLM wybierze `search_web` zamiast `search_wikipedia` — pytamy o coś **aktualnego i konkretnego**:"""))
 
 cells.append(code("""\
 if client:
     # Pytanie o aktualne wydarzenia → LLM powinien wybrać search_web (nie Wikipedię)
-    ask_with_tools("Jakie są najnowsze wiadomości ze świata technologii?")\
+    ask_with_tools("Kto wygrał ostatni finał Ligi Mistrzów?")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
