@@ -1619,40 +1619,62 @@ Dzięki temu końcowa odpowiedź to nie tekst do parsowania, ale obiekt z polami
 
 Połączmy function calling ze Structured Output!
 
-**Zadanie:** Zdefiniuj model `FactCheck` i napisz funkcję, która:
-1. Dostaje twierdzenie do sprawdzenia (np. *"Lech Wałęsa dostał Nagrodę Nobla w 1990"*)
-2. Szuka dowodów — w bazie prezydentów lub na Wikipedii
-3. Używa `instructor` żeby LLM zwrócił **ustrukturyzowany werdykt**: prawda / fałsz / nie da się zweryfikować
+Funkcja `verify_claim()` jest gotowa — szuka dowodów w bazie prezydentów i na Wikipedii,
+a potem używa `instructor` żeby LLM zwrócił **ustrukturyzowany werdykt**.
 
-**Model FactCheck powinien mieć pola:**
-- `claim` — sprawdzane twierdzenie
-- `evidence` — znalezione dowody
+**Twoje zadanie:** Uzupełnij model `FactCheck` — 5 pól Pydantic:
+- `claim` — sprawdzane twierdzenie (str)
+- `evidence` — znalezione dowody (str)
 - `verdict` — werdykt: `Literal["prawda", "fałsz", "nie da się zweryfikować"]`
-- `confidence` — pewność (0-1)
-- `source` — skąd pochodzi dowód"""))
+- `confidence` — pewność 0-1: `Field(..., ge=0, le=1)`
+- `source` — skąd pochodzi dowód (str)
+
+To jest właśnie **Structured Output** — `instructor` wymusza, żeby LLM zwrócił obiekt
+dokładnie w formacie Twojego modelu Pydantic. Jeśli LLM pominie pole, instructor
+automatycznie ponawia zapytanie z feedbackiem!"""))
 
 cells.append(student_stub("""\
-# Ćwiczenie 4: FactCheck
-
-# Krok 1: Zdefiniuj model
+# Ćwiczenie 4: Uzupełnij model FactCheck
 
 class FactCheck(BaseModel):
 
-    pass  # Tutaj wpisz swój kod — 5 pól opisanych powyżej
+    pass  # ✏️ Tutaj wpisz 5 pól opisanych powyżej
 
-# Krok 2: Napisz funkcję verify_claim
+# --- verify_claim() jest gotowa — nie zmieniaj ---
 
 def verify_claim(claim: str) -> FactCheck:
+    # Szukamy dowodów — najpierw w bazie prezydentów, potem na Wikipedii.
+    # Uwaga: szukamy po NAZWISKU, nie pełnym zdaniem — inaczej search nie znajdzie.
+    # Wyciągamy kluczowe słowa z twierdzenia (imiona, nazwiska, tematy).
+    search_query = claim
 
-    pass  # Tutaj wpisz swój kod
+    evidence = search_presidents(search_query)
+    source = "baza prezydentów"
+    if "Nie znaleziono" in evidence:
+        evidence = search_wikipedia(search_query)
+        source = "Wikipedia"
+
+    # instructor wymusza, żeby LLM odpowiedział DOKŁADNIE w formacie FactCheck.
+    # Jeśli LLM pominie pole, instructor automatycznie ponawia z feedbackiem.
+    # Hint "PŁASKIM JSON-em" to workaround na mniejsze modele (np. Gemma),
+    # które czasem generują {"properties": {...}} zamiast płaskiego obiektu.
+    return instructor_client.chat.completions.create(
+        model=MODEL_NAME,
+        response_model=FactCheck,
+        messages=[
+            {"role": "system", "content":
+             "Jesteś weryfikatorem faktów. Na podstawie DOWODÓW oceń twierdzenie. "
+             "Jeśli dowody nie wystarczają, powiedz 'nie da się zweryfikować'. Bądź uczciwy. "
+             "Odpowiedz PŁASKIM JSON-em — NIE owijaj w 'properties'."},
+            {"role": "user", "content":
+             f"Twierdzenie: {claim}\\n\\nDowody ({source}):\\n{evidence}"}
+        ],
+    )
 
 # --- TEST (nie zmieniaj) ---
-_test_fc = verify_claim("test") if instructor_client else None
 if not instructor_client:
     print("instructor_client niedostępny — pomiń to ćwiczenie.")
-elif _test_fc is None:
-    print("\\033[1;31m⬆️ Uzupełnij funkcję verify_claim! Teraz zwraca None (pass).\\033[0m")
-elif not hasattr(_test_fc, 'verdict'):
+elif not hasattr(FactCheck, 'model_fields') or 'verdict' not in FactCheck.model_fields:
     print("\\033[1;31m⬆️ Uzupełnij model FactCheck! Brakuje pola 'verdict'.\\033[0m")
 else:
     twierdzenia = [
@@ -1679,13 +1701,13 @@ cells.append(h6_collapsed(
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
-Krok 1: Użyj `Literal["prawda", "fałsz", "nie da się zweryfikować"]` dla verdict, `Field(..., ge=0, le=1)` dla confidence. Krok 2: Najpierw wyszukaj dowody — spróbuj `search_presidents(claim)`, a jeśli nie znajdziesz, to `search_wikipedia(claim)`. Potem podaj wynik jako kontekst do `instructor_client.chat.completions.create(response_model=FactCheck, ...)`. **Tip:** Mniejsze modele czasem generują JSON owinięty w `"properties"` — dodaj w system prompcie: *"Odpowiedz PŁASKIM JSON-em, NIE owijaj w properties"*."""))
+Użyj `Literal["prawda", "fałsz", "nie da się zweryfikować"]` dla verdict, `Field(..., ge=0, le=1)` dla confidence. Każde pole potrzebuje `Field(..., description="...")`. Funkcja `verify_claim()` jest gotowa — wystarczy uzupełnić model."""))
 cells.append(h6_collapsed(
     '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(code("""\
-# Ćwiczenie 4 — rozwiązanie
+# Ćwiczenie 4 — rozwiązanie (tylko model — verify_claim jest gotowa powyżej)
 
 class FactCheck(BaseModel):
     claim: str = Field(..., description="Sprawdzane twierdzenie")
@@ -1695,28 +1717,6 @@ class FactCheck(BaseModel):
     )
     confidence: float = Field(..., ge=0, le=1, description="Pewność werdyktu (0=zgaduję, 1=pewny)")
     source: str = Field(..., description="Skąd pochodzą dowody, np. 'baza prezydentów', 'Wikipedia'")
-
-def verify_claim(claim: str) -> FactCheck:
-    # Szukaj dowodów — najpierw prezydenci, potem Wikipedia
-    evidence = search_presidents(claim)
-    source = "baza prezydentów"
-    if "Nie znaleziono" in evidence:
-        evidence = search_wikipedia(claim)
-        source = "Wikipedia"
-
-    return instructor_client.chat.completions.create(
-        model=MODEL_NAME,
-        response_model=FactCheck,
-        messages=[
-            {"role": "system", "content":
-             "Jesteś weryfikatorem faktów. Na podstawie DOWODÓW oceń twierdzenie. "
-             "Jeśli dowody nie wystarczają, powiedz 'nie da się zweryfikować'. Bądź uczciwy. "
-             "Odpowiedz PŁASKIM JSON-em z polami: claim, evidence, verdict, confidence, source. "
-             "NIE owijaj w 'properties' ani inne klucze — podaj pola bezpośrednio."},
-            {"role": "user", "content":
-             f"Twierdzenie: {claim}\\n\\nDowody ({source}):\\n{evidence}"}
-        ],
-    )
 
 # --- TEST ---
 if instructor_client:
