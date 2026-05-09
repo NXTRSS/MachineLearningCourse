@@ -1615,63 +1615,63 @@ ale **końcowa odpowiedź** LLM-a to wolny tekst. Co jeśli chcemy ją ustruktur
 Dzięki temu końcowa odpowiedź to nie tekst do parsowania, ale obiekt z polami: `verdict`, `confidence`, `source`.
 </div>
 
-### Ćwiczenie 4: FactCheck — zweryfikuj twierdzenie strukturalnie
+Combo pattern w praktyce — funkcja `verify_claim()`:"""))
 
-Połączmy function calling ze Structured Output!
+cells.append(code("""\
+def verify_claim(claim: str) -> "FactCheck":
+    \"\"\"
+    Combo pattern:
+      Krok 1 (FC): szukaj dowodów — najpierw search_presidents (LLM strukturyzuje query),
+                    a jeśli nie znajdzie → FC z WSZYSTKIMI narzędziami (Wikipedia, web, itp.)
+      Krok 2 (Structured Output): instructor formatuje werdykt w FactCheck
+    \"\"\"
 
-Funkcja `verify_claim()` jest gotowa — szuka dowodów w bazie prezydentów i na Wikipedii,
-a potem używa `instructor` żeby LLM zwrócił **ustrukturyzowany werdykt**.
-
-**Twoje zadanie:** Uzupełnij model `FactCheck` — 5 pól Pydantic:
-- `claim` — sprawdzane twierdzenie (str)
-- `evidence` — znalezione dowody (str)
-- `verdict` — werdykt: `Literal["prawda", "fałsz", "nie da się zweryfikować"]`
-- `confidence` — pewność 0-1: `Field(..., ge=0, le=1)`
-- `source` — skąd pochodzi dowód (str)
-
-To jest właśnie **Structured Output** — `instructor` wymusza, żeby LLM zwrócił obiekt
-dokładnie w formacie Twojego modelu Pydantic. Jeśli LLM pominie pole, instructor
-automatycznie ponawia zapytanie z feedbackiem!"""))
-
-cells.append(student_stub("""\
-# Ćwiczenie 4: Uzupełnij model FactCheck
-
-class FactCheck(BaseModel):
-
-    pass  # ✏️ Tutaj wpisz 5 pól opisanych powyżej
-
-# --- verify_claim() jest gotowa — nie zmieniaj ---
-
-def verify_claim(claim: str) -> FactCheck:
-    # ── Krok 1: Function Calling — LLM wybiera narzędzie i strukturyzuje zapytanie ──
-    # Nie szukamy pełnym zdaniem! LLM sam wyciąga kluczowe słowa
-    # (np. "Lech Wałęsa dostał Nobla w 1983" → search_presidents("Wałęsa Nobel"))
-    messages = [
-        {"role": "system", "content":
-         "Znajdź dowody na temat tego twierdzenia. Użyj dostępnych narzędzi. "
-         "ZAWSZE użyj narzędzia — nie odpowiadaj z pamięci."},
-        {"role": "user", "content": claim}
-    ]
-    response = client.chat.completions.create(
-        model=MODEL_NAME, messages=messages, tools=tools_definition, temperature=0.1
+    # ── Krok 1a: FC → search_presidents (nasza baza z fikcyjnymi faktami!) ──
+    pres_response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content":
+             "Znajdź informacje o tym twierdzeniu w bazie prezydentów. "
+             "ZAWSZE użyj narzędzia search_presidents — nie odpowiadaj z pamięci."},
+            {"role": "user", "content": claim}
+        ],
+        tools=[t for t in tools_definition if t["function"]["name"] == "search_presidents"],
+        temperature=0.1,
     )
-    msg = response.choices[0].message
+    pres_msg = pres_response.choices[0].message
 
-    # Wykonaj tool call jeśli LLM go wybrał
-    evidence = "Brak dowodów — LLM nie użył narzędzia."
+    evidence = "Nie znaleziono"
     source = "brak"
-    if msg.tool_calls:
-        tc = msg.tool_calls[0]
-        func_name = tc.function.name
+    if pres_msg.tool_calls:
+        tc = pres_msg.tool_calls[0]
         func_args = json.loads(tc.function.arguments)
-        evidence = AVAILABLE_TOOLS.get(func_name, lambda **kw: "Nieznane narzędzie")(**func_args)
-        source = func_name
+        evidence = search_presidents(**func_args)
+        source = "search_presidents"
+
+    # ── Krok 1b: Jeśli baza prezydentów nie pomogła → FC ze wszystkimi narzędziami ──
+    if "Nie znaleziono" in evidence:
+        full_response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content":
+                 "Znajdź dowody na temat tego twierdzenia. Użyj dostępnych narzędzi. "
+                 "ZAWSZE użyj narzędzia — nie odpowiadaj z pamięci."},
+                {"role": "user", "content": claim}
+            ],
+            tools=tools_definition,
+            temperature=0.1,
+        )
+        full_msg = full_response.choices[0].message
+        if full_msg.tool_calls:
+            tc = full_msg.tool_calls[0]
+            func_name = tc.function.name
+            func_args = json.loads(tc.function.arguments)
+            evidence = AVAILABLE_TOOLS.get(func_name, lambda **kw: "Nieznane narzędzie")(**func_args)
+            source = func_name
 
     # ── Krok 2: Structured Output — instructor formatuje werdykt ──
-    # instructor wymusza, żeby LLM odpowiedział DOKŁADNIE w formacie FactCheck.
-    # Jeśli LLM pominie pole, instructor automatycznie ponawia z feedbackiem.
-    # Hint "PŁASKIM JSON-em" to workaround na mniejsze modele (np. Gemma),
-    # które czasem generują {"properties": {...}} zamiast płaskiego obiektu.
+    # instructor wymusza format FactCheck. Hint o PŁASKIM JSONie to workaround
+    # na mniejsze modele (np. Gemma) które owijają JSON w "properties".
     return instructor_client.chat.completions.create(
         model=MODEL_NAME,
         response_model=FactCheck,
@@ -1685,6 +1685,31 @@ def verify_claim(claim: str) -> FactCheck:
         ],
     )
 
+print("Funkcja verify_claim() gotowa — potrzebuje modelu FactCheck (ćwiczenie 4).")\
+"""))
+
+cells.append(md("""\
+### Ćwiczenie 4: FactCheck — zweryfikuj twierdzenie strukturalnie
+
+Funkcja `verify_claim()` jest gotowa powyżej — brakuje jej tylko **modelu `FactCheck`**.
+
+**Twoje zadanie:** Uzupełnij 5 pól Pydantic:
+- `claim` — sprawdzane twierdzenie (str)
+- `evidence` — znalezione dowody (str)
+- `verdict` — werdykt: `Literal["prawda", "fałsz", "nie da się zweryfikować"]`
+- `confidence` — pewność 0-1: `Field(..., ge=0, le=1)`
+- `source` — skąd pochodzi dowód (str)
+
+`instructor` wymusza, żeby LLM zwrócił obiekt dokładnie w formacie Twojego modelu.
+Jeśli LLM pominie pole, instructor automatycznie ponawia zapytanie z feedbackiem!"""))
+
+cells.append(student_stub("""\
+# Ćwiczenie 4: Uzupełnij model FactCheck
+
+class FactCheck(BaseModel):
+
+    pass  # ✏️ Tutaj wpisz 5 pól opisanych powyżej
+
 # --- TEST (nie zmieniaj) ---
 if not instructor_client:
     print("instructor_client niedostępny — pomiń to ćwiczenie.")
@@ -1693,8 +1718,8 @@ elif not hasattr(FactCheck, 'model_fields') or 'verdict' not in FactCheck.model_
 else:
     twierdzenia = [
         "Lech Wałęsa dostał Pokojową Nagrodę Nobla w 1983 roku",
+        "Aleksander Kwaśniewski posiadał popiersie Kleopatry",
         "Kraków jest stolicą Polski",
-        "Aleksander Kwaśniewski miał 41 lat gdy został prezydentem",
     ]
     for t in twierdzenia:
         try:
@@ -1736,6 +1761,7 @@ class FactCheck(BaseModel):
 if instructor_client:
     twierdzenia = [
         "Lech Wałęsa dostał Pokojową Nagrodę Nobla w 1983 roku",
+        "Aleksander Kwaśniewski posiadał popiersie Kleopatry",
         "Kraków jest stolicą Polski",
     ]
     for t in twierdzenia:
