@@ -190,6 +190,8 @@ def calculate(expression: str) -> str:
         expression: Wyrażenie matematyczne, np. '2 + 2', 'sqrt(144)', '15 * 7'
     \"\"\"
     try:
+        # LLM często pisze ^ zamiast ** (notacja matematyczna vs Python)
+        expression = expression.replace("^", "**")
         allowed = {"sqrt": math.sqrt, "sin": math.sin, "cos": math.cos,
                    "pi": math.pi, "abs": abs, "round": round, "pow": pow}
         result = eval(expression, {"__builtins__": {}}, allowed)
@@ -831,7 +833,7 @@ class ToolReasoning(BaseModel):
     confidence: float = Field(..., ge=0, le=1, description="Pewność wyboru w skali 0-1")
 
 
-def ask_with_tools(question, verbose=True, show_reasoning=False):
+def ask_with_tools(question, verbose=True, show_reasoning=True):
     if not client:
         print("LLM niedostępny.")
         return None
@@ -1122,9 +1124,32 @@ cells.append(code("""\
 # Ćwiczenie 1B (test): Wysyłamy pytanie — LLM widzi podmienione opisy
 
 if client:
+    # Nazwy narzędzi w sabotażu to tool_alpha/tool_beta — podajemy je do reasoning
+    sabotaged_names = [t["function"]["name"] for t in sabotaged_tools]
+
     for question in ["Jaka jest pogoda we Wrocławiu?", "Opowiedz mi o Wrocławiu jako mieście"]:
         print(f"{'═'*60}")
         print(f"Pytanie: \\"{question}\\"\\n")
+
+        # Wymuszony reasoning — zobaczmy CO model myśli o sabotażowych narzędziach
+        if instructor_client:
+            try:
+                reasoning = instructor_client.chat.completions.create(
+                    model=MODEL_NAME,
+                    response_model=ToolReasoning,
+                    messages=[
+                        {"role": "system", "content":
+                         f"Masz dostępne narzędzia: {sabotaged_names}. "
+                         f"Opisy: {[t['function']['description'] for t in sabotaged_tools]}. Zdecyduj."},
+                        {"role": "user", "content": question}
+                    ],
+                )
+                print(f"  🔍 Reasoning (wymuszony):")
+                print(f"     Myślenie:   {reasoning.thinking}")
+                print(f"     Narzędzie:  {reasoning.tool_name or 'BRAK'} (pewność: {reasoning.confidence:.0%})")
+                print()
+            except Exception:
+                pass
 
         messages = [
             {"role": "system", "content":
@@ -1140,7 +1165,7 @@ if client:
 
         tok = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
         if tok:
-            print(f"  🧠 Tok myślenia (reasoning):")
+            print(f"  🧠 Tok myślenia (natywny):")
             for line in str(tok)[:500].split("\\n"):
                 print(f"     {line}")
             print()
@@ -1391,21 +1416,25 @@ wikipedia.set_lang("pl")
 
 def search_wikipedia(query: str) -> str:
     \"\"\"Przeszukuje Wikipedię i zwraca tytuł + streszczenie artykułu.\"\"\"
-    results = wikipedia.search(query, results=3)
-    if not results:
-        return f"Nie znaleziono artykułów dla: {query}"
-
     try:
-        page = wikipedia.page(results[0])
-    except wikipedia.DisambiguationError as e:
-        page = wikipedia.page(e.options[0])
+        results = wikipedia.search(query, results=3)
+        if not results:
+            return f"Nie znaleziono artykułów dla: {query}"
 
-    # ✏️ UZUPEŁNIJ: Zwróć f-stringa z informacjami ze strony.
-    # Użyj page.title, page.summary (obetnij do 500 znaków: page.summary[:500])
-    # i page.url. Połącz je w jednego f-stringa oddzielonego enterami (\\n\\n).
-    # Wzór:  f"{tytuł}\\n\\n{streszczenie}\\n\\nŹródło: {url}"
+        try:
+            page = wikipedia.page(results[0])
+        except wikipedia.DisambiguationError as e:
+            page = wikipedia.page(e.options[0])
 
-    ...
+        # ✏️ UZUPEŁNIJ: Zwróć f-stringa z informacjami ze strony.
+        # Użyj page.title, page.summary (obetnij do 500 znaków: page.summary[:500])
+        # i page.url. Połącz je w jednego f-stringa oddzielonego enterami (\\n\\n).
+        # Wzór:  f"{tytuł}\\n\\n{streszczenie}\\n\\nŹródło: {url}"
+
+        ...
+
+    except Exception as e:
+        return f"Błąd wyszukiwania Wikipedia: {e}"
 
 # --- Rejestracja narzędzia ---
 AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
@@ -1457,16 +1486,20 @@ wikipedia.set_lang("pl")
 
 def search_wikipedia(query: str) -> str:
     \"\"\"Przeszukuje Wikipedię i zwraca tytuł + streszczenie artykułu.\"\"\"
-    results = wikipedia.search(query, results=3)
-    if not results:
-        return f"Nie znaleziono artykułów dla: {query}"
-
     try:
-        page = wikipedia.page(results[0])
-    except wikipedia.DisambiguationError as e:
-        page = wikipedia.page(e.options[0])
+        results = wikipedia.search(query, results=3)
+        if not results:
+            return f"Nie znaleziono artykułów dla: {query}"
 
-    return f"{page.title}\\n\\n{page.summary[:500]}\\n\\nŹródło: {page.url}"
+        try:
+            page = wikipedia.page(results[0])
+        except wikipedia.DisambiguationError as e:
+            page = wikipedia.page(e.options[0])
+
+        return f"{page.title}\\n\\n{page.summary[:500]}\\n\\nŹródło: {page.url}"
+
+    except Exception as e:
+        return f"Błąd wyszukiwania Wikipedia: {e}"
 
 AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
 
