@@ -951,7 +951,7 @@ def test_1a(pytanie):
 
 # ═══ TESTUJ TUTAJ — zmień pytanie i uruchom komórkę ponownie! ═══
 
-test_1a("Jaka jest pogoda w Krakowie?")\
+test_1a("Jaka jest pogoda we Wrocławiu?")\
 """))
 
 cells.append(h6_collapsed(
@@ -998,7 +998,7 @@ def test_1a(pytanie):
             print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")
 
 # ═══ TESTUJ TUTAJ ═══
-test_1a("Jaka jest pogoda w Krakowie?")\
+test_1a("Jaka jest pogoda we Wrocławiu?")\
 """))
 cells.append(separator())
 
@@ -1077,7 +1077,7 @@ cells.append(code("""\
 # Ćwiczenie 1B (test): Wysyłamy pytanie — LLM widzi podmienione opisy
 
 if client:
-    for question in ["Jaka jest pogoda w Krakowie?", "Opowiedz mi o Krakowie jako mieście"]:
+    for question in ["Jaka jest pogoda we Wrocławiu?", "Opowiedz mi o Wrocławiu jako mieście"]:
         print(f"{'═'*60}")
         print(f"Pytanie: \\"{question}\\"\\n")
 
@@ -1336,11 +1336,11 @@ import wikipedia
 wikipedia.set_lang("pl")
 
 # Biblioteka wikipedia:
-#   wikipedia.search("Kraków")     → lista tytułów: ["Kraków", "Kraków (ujednoznacznienie)", ...]
-#   wikipedia.page("Kraków")       → obiekt strony z polami:
-#       page.title   → "Kraków"
-#       page.summary → "Kraków – miasto na prawach powiatu..."  (pełne streszczenie)
-#       page.url     → "https://pl.wikipedia.org/wiki/Kraków"
+#   wikipedia.search("Wrocław")     → lista tytułów: ["Wrocław", "Wrocław (ujednoznacznienie)", ...]
+#   wikipedia.page("Wrocław")       → obiekt strony z polami:
+#       page.title   → "Wrocław"
+#       page.summary → "Wrocław – miasto na prawach powiatu..."  (pełne streszczenie)
+#       page.url     → "https://pl.wikipedia.org/wiki/Wrocław"
 #
 # Uwaga: wikipedia.page() może rzucić DisambiguationError — złap go w try/except.
 
@@ -1355,34 +1355,34 @@ def search_wikipedia(query: str) -> str:
     except wikipedia.DisambiguationError as e:
         page = wikipedia.page(e.options[0])
 
-    # Mamy obiekt page — złóż z niego tekst do zwrócenia.
+    # ✏️ UZUPEŁNIJ: Zwróć f-stringa z informacjami ze strony.
     # Użyj page.title, page.summary (obetnij do 500 znaków: page.summary[:500])
-    # i page.url. Połącz je w jednego f-stringa oddzielonego enterami (\\n).
+    # i page.url. Połącz je w jednego f-stringa oddzielonego enterami (\\n\\n).
     # Wzór:  f"{tytuł}\\n\\n{streszczenie}\\n\\nŹródło: {url}"
 
-    return f"{page.title}\\n\\n{page.summary[:500]}\\n\\nŹródło: {page.url}"
+    ...
 
 # --- Rejestracja narzędzia ---
 AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
 
 class SearchWikipediaArgs(BaseModel):
 
-    query: str = Field(..., description=...  # Tutaj wpisz opis argumentu — co to jest query?
+    query: str = Field(..., description=...  # ✏️ Tutaj wpisz opis argumentu — co to jest query?
     )
 
 tools_definition.append(
     make_tool(
         "search_wikipedia",
 
-        ...  # Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
+        ...  # ✏️ Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
 
         SearchWikipediaArgs,
     )
 )
 
 # --- TEST (nie zmieniaj) ---
-_test_result = search_wikipedia("Kraków")
-if _test_result is None:
+_test_result = search_wikipedia("Wrocław")
+if _test_result is None or _test_result is ...:
     print("\\033[1;31m⬆️ Uzupełnij return w search_wikipedia!\\033[0m")
 elif "search_wikipedia" not in AVAILABLE_TOOLS:
     print("\\033[1;31m⬆️ Dodaj search_wikipedia do AVAILABLE_TOOLS!\\033[0m")
@@ -1411,20 +1411,17 @@ import wikipedia
 wikipedia.set_lang("pl")
 
 def search_wikipedia(query: str) -> str:
+    \"\"\"Przeszukuje Wikipedię i zwraca tytuł + streszczenie artykułu.\"\"\"
+    results = wikipedia.search(query, results=3)
+    if not results:
+        return f"Nie znaleziono artykułów dla: {query}"
+
     try:
-        results = wikipedia.search(query, results=3)
-        if not results:
-            return f"Nie znaleziono artykułów dla: {query}"
         page = wikipedia.page(results[0])
-        return f"{page.title}\\n\\n{page.summary[:500]}\\n\\nŹródło: {page.url}"
     except wikipedia.DisambiguationError as e:
-        try:
-            page = wikipedia.page(e.options[0])
-            return f"{page.title}\\n\\n{page.summary[:500]}\\n\\nŹródło: {page.url}"
-        except Exception:
-            return f"Znaleziono wiele wyników: {', '.join(e.options[:5])}"
-    except Exception as e:
-        return f"Błąd wyszukiwania: {e}"
+        page = wikipedia.page(e.options[0])
+
+    return f"{page.title}\\n\\n{page.summary[:500]}\\n\\nŹródło: {page.url}"
 
 AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
 
@@ -1440,7 +1437,7 @@ tools_definition.append(
 
 # --- TEST ---
 print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
-print(f"\\nTest: {search_wikipedia('Kraków')[:200]}...")
+print(f"\\nTest: {search_wikipedia('Wrocław')[:200]}...")
 if client:
     print()
     ask_with_tools("Kim był Mikołaj Kopernik?")\
