@@ -1497,9 +1497,18 @@ tools_definition.append(
 print("Narzędzie search_web dodane!")
 print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
 
-print("\\nTest:")
+print("\\nTest bezpośredni:")
 result = search_web("Python programming language")
 print(result[:300] + "..." if len(result) > 300 else result)\
+"""))
+
+cells.append(md("""\
+Sprawdźmy, czy LLM wybierze `search_web` zamiast `search_wikipedia` — pytamy o coś **aktualnego**:"""))
+
+cells.append(code("""\
+if client:
+    # Pytanie o aktualne wydarzenia → LLM powinien wybrać search_web (nie Wikipedię)
+    ask_with_tools("Jakie są najnowsze wiadomości ze świata technologii?")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
