@@ -849,7 +849,8 @@ def ask_with_tools(question, verbose=True, show_reasoning=True):
                 messages=[
                     {"role": "system", "content":
                      f"Masz dostępne narzędzia: {list(AVAILABLE_TOOLS.keys())}. "
-                     "Zdecyduj które narzędzie użyć (lub żadne)."},
+                     "Zdecyduj które narzędzie użyć (lub żadne). "
+                     "Odpowiedz PŁASKIM JSON-em z polami: thinking, needs_tool, tool_name, confidence."},
                     {"role": "user", "content": question}
                 ],
             )
@@ -1140,7 +1141,8 @@ if client:
                     messages=[
                         {"role": "system", "content":
                          f"Masz dostępne narzędzia: {sabotaged_names}. "
-                         f"Opisy: {[t['function']['description'] for t in sabotaged_tools]}. Zdecyduj."},
+                         f"Opisy: {[t['function']['description'] for t in sabotaged_tools]}. Zdecyduj. "
+                         "Odpowiedz PŁASKIM JSON-em z polami: thinking, needs_tool, tool_name, confidence."},
                         {"role": "user", "content": question}
                     ],
                 )
@@ -1594,40 +1596,10 @@ if client:
 # ══════════════════════════════════════════════════════════════════════
 
 cells.append(md("""\
-## 9. Structured Output — zaawansowane użycie
+## 9. Combo: Function Calling + Structured Output
 
-W sekcji 3b poznaliśmy `instructor` — LLM odpowiada jako obiekt Pydantic zamiast tekstu.
-Teraz użyjemy go do czegoś poważniejszego: **LLM który uzasadnia swoje decyzje strukturalnie**.
-
-<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:14px; border-radius:4px;">
-
-**Pydantic vs. instructor — kto co robi?**
-
-| | **Pydantic** | **instructor** |
-|---|---|---|
-| **Rola** | Walidator — sprawdza czy dane pasują do schematu | Orkiestrator — wymusza schemat na LLM-ie |
-| **Gdy LLM pominie pole** | `ValidationError` → crash | Łapie błąd, wysyła do LLM-a feedback: *"Brakuje pola humidity_percent"* i każe wygenerować ponownie |
-| **Retry** | Nie — nie wie że rozmawia z LLM-em | Tak — domyślnie do 3 prób |
-
-Czyli: **Pydantic mówi "źle!"**, a **instructor łapie ten błąd i każe LLM-owi poprawić**.
-</div>
-
-### Gdzie Structured Output + Function Calling współpracują?
-
-Pomyślmy o łańcuchu function calli (pętla agentowa):
-
-```
-Pytanie: "Sprawdź pogodę w Krakowie i oblicz ile to w Fahrenheitach"
-
-Krok 1: LLM → tool_call: get_weather(city="Kraków")       ← argumenty są JUŻ strukturalne (protokół tools)
-        → wynik: "Kraków: 18°C, słonecznie"                 ← zwykły tekst — LLM sobie poradzi
-Krok 2: LLM → tool_call: calculate(expression="18*9/5+32") ← argumenty znowu strukturalne (tools)
-        → wynik: "18*9/5+32 = 64.4"
-Krok 3: LLM → ODPOWIEDŹ: "W Krakowie jest 18°C czyli 64°F" ← to jest ZWYKŁY TEKST!
-```
-
-Widzisz? W łańcuchu wejścia do narzędzi są strukturalne (protokół `tools=`), wyjścia z narzędzi
-to zwykły tekst — LLM sobie z nim radzi. Ale **końcowa odpowiedź** LLM-a to wolny tekst — i właśnie tu wchodzi instructor!
+W łańcuchu function calli argumenty narzędzi są strukturalne (protokół `tools=`),
+ale **końcowa odpowiedź** LLM-a to wolny tekst. Co jeśli chcemy ją ustrukturyzować?
 
 <div style="background:#fff3cd; border-left:4px solid #ffc107; padding:12px; border-radius:4px;">
 
@@ -1726,11 +1698,16 @@ else:
         "Aleksander Kwaśniewski miał 41 lat gdy został prezydentem",
     ]
     for t in twierdzenia:
-        fc = verify_claim(t)
-        print(f"Twierdzenie: {t}")
-        print(f"  Werdykt:  {fc.verdict} (pewność: {fc.confidence:.0%})")
-        print(f"  Dowody:   {fc.evidence[:100]}")
-        print(f"  Źródło:   {fc.source}")
+        try:
+            fc = verify_claim(t)
+            print(f"Twierdzenie: {t}")
+            print(f"  Werdykt:  {fc.verdict} (pewność: {fc.confidence:.0%})")
+            print(f"  Dowody:   {fc.evidence[:100]}")
+            print(f"  Źródło:   {fc.source}")
+        except Exception as e:
+            print(f"Twierdzenie: {t}")
+            print(f"  ⚠️ Błąd: {str(e)[:150]}")
+            print("  (Mniejsze modele mogą nie generować poprawnego JSON-a — spróbuj z większym)")
         print()\
 """))
 
@@ -1739,7 +1716,7 @@ cells.append(h6_collapsed(
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
 ))
 cells.append(md("""\
-Krok 1: Użyj `Literal["prawda", "fałsz", "nie da się zweryfikować"]` dla verdict, `Field(..., ge=0, le=1)` dla confidence. Krok 2: Najpierw wyszukaj dowody — spróbuj `search_presidents(claim)`, a jeśli nie znajdziesz, to `search_wikipedia(claim)`. Potem podaj wynik jako kontekst do `instructor_client.chat.completions.create(response_model=FactCheck, ...)`."""))
+Krok 1: Użyj `Literal["prawda", "fałsz", "nie da się zweryfikować"]` dla verdict, `Field(..., ge=0, le=1)` dla confidence. Krok 2: Najpierw wyszukaj dowody — spróbuj `search_presidents(claim)`, a jeśli nie znajdziesz, to `search_wikipedia(claim)`. Potem podaj wynik jako kontekst do `instructor_client.chat.completions.create(response_model=FactCheck, ...)`. **Tip:** Mniejsze modele czasem generują JSON owinięty w `"properties"` — dodaj w system prompcie: *"Odpowiedz PŁASKIM JSON-em, NIE owijaj w properties"*."""))
 cells.append(h6_collapsed(
     '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
     '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
@@ -1770,7 +1747,9 @@ def verify_claim(claim: str) -> FactCheck:
         messages=[
             {"role": "system", "content":
              "Jesteś weryfikatorem faktów. Na podstawie DOWODÓW oceń twierdzenie. "
-             "Jeśli dowody nie wystarczają, powiedz 'nie da się zweryfikować'. Bądź uczciwy."},
+             "Jeśli dowody nie wystarczają, powiedz 'nie da się zweryfikować'. Bądź uczciwy. "
+             "Odpowiedz PŁASKIM JSON-em z polami: claim, evidence, verdict, confidence, source. "
+             "NIE owijaj w 'properties' ani inne klucze — podaj pola bezpośrednio."},
             {"role": "user", "content":
              f"Twierdzenie: {claim}\\n\\nDowody ({source}):\\n{evidence}"}
         ],
@@ -1783,11 +1762,16 @@ if instructor_client:
         "Kraków jest stolicą Polski",
     ]
     for t in twierdzenia:
-        fc = verify_claim(t)
-        print(f"Twierdzenie: {t}")
-        print(f"  Werdykt:  {fc.verdict} (pewność: {fc.confidence:.0%})")
-        print(f"  Dowody:   {fc.evidence[:100]}...")
-        print(f"  Źródło:   {fc.source}")
+        try:
+            fc = verify_claim(t)
+            print(f"Twierdzenie: {t}")
+            print(f"  Werdykt:  {fc.verdict} (pewność: {fc.confidence:.0%})")
+            print(f"  Dowody:   {fc.evidence[:100]}...")
+            print(f"  Źródło:   {fc.source}")
+        except Exception as e:
+            print(f"Twierdzenie: {t}")
+            print(f"  ⚠️ Model nie wygenerował poprawnego JSON-a: {str(e)[:150]}")
+            print("  (Mniejsze modele czasem owijają JSON w 'properties' — spróbuj z większym modelem)")
         print()
 else:
     print("instructor_client niedostępny — pomiń to ćwiczenie.")\
