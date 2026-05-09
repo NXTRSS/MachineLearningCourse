@@ -101,7 +101,7 @@ ensure_package("openai")
 ensure_package("pydantic")
 ensure_package("instructor")
 ensure_package("wikipedia")
-ensure_package("duckduckgo-search", "duckduckgo_search")
+ensure_package("ddgs")
 
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -1456,7 +1456,7 @@ cells.append(md("""\
 
 Wikipedia jest świetna dla encyklopedycznej wiedzy. Ale co z **aktualnymi wydarzeniami**?
 
-Biblioteka `duckduckgo-search` pozwala przeszukiwać internet przez DuckDuckGo — **bez klucza API**!
+Biblioteka `ddgs` pozwala przeszukiwać internet przez DuckDuckGo — **bez klucza API**!
 
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px;">
 <b>Dlaczego DuckDuckGo a nie Google?</b> Google wymaga klucza API i ma płatne limity.
@@ -1465,7 +1465,7 @@ Uwaga: przy wielu zapytaniach może pojawić się rate limiting (tymczasowa blok
 </div>"""))
 
 cells.append(code("""\
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 
 def search_web(query: str) -> str:
