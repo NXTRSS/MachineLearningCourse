@@ -1547,15 +1547,20 @@ from ddgs import DDGS
 
 def search_web(query: str) -> str:
     \"\"\"
-    Przeszukuje internet przez DuckDuckGo.
+    Przeszukuje internet przez DuckDuckGo (pomija Wikipedię — od tego mamy osobne narzędzie).
 
     Args:
         query: Zapytanie, np. 'najnowsze wiadomości Polska'
     \"\"\"
     try:
-        raw_results = DDGS().text(query, max_results=3)
+        # Pobieramy więcej wyników, bo część odfiltrujemy (Wikipedia)
+        raw_results = DDGS().text(query, max_results=8)
+        # Filtrujemy Wikipedię — mamy osobny tool search_wikipedia
+        results = [r for r in raw_results if "wikipedia.org" not in r.get("href", "")][:3]
+        if not results:
+            return f"Brak wyników (poza Wikipedią) dla: {query}. Spróbuj search_wikipedia."
         parts = [f"Wyniki wyszukiwania: {query}\\n"]
-        for i, r in enumerate(raw_results, 1):
+        for i, r in enumerate(results, 1):
             parts.append(f"{i}. {r['title']}\\n   {r['body'][:200]}\\n   {r['href']}")
         return "\\n\\n".join(parts)
     except Exception as e:
