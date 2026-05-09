@@ -2159,6 +2159,81 @@ Wszystkie działają na tej samej zasadzie: **LLM + zestaw narzędzi + pętla ag
 
 
 # ══════════════════════════════════════════════════════════════════════
+# SZKICE — do przetestowania, jeszcze nie w notebooku
+# ══════════════════════════════════════════════════════════════════════
+#
+# --- chat_with_tools: wersja ask_with_tools z pamięcią konwersacji ---
+#
+# Idea: messages żyje poza funkcją → każde pytanie widzi poprzednie.
+# Użycie:
+#   history = []
+#   chat_with_tools(history, "Jaka pogoda we Wrocławiu?")
+#   chat_with_tools(history, "A jaka populacja tego miasta?")  # LLM pamięta "Wrocław"
+#
+# def chat_with_tools(messages, question, verbose=True):
+#     """ask_with_tools z pamięcią — messages jest listą modyfikowaną in-place."""
+#     if not client:
+#         print("LLM niedostępny.")
+#         return None
+#
+#     # Przy pierwszym pytaniu dodaj system prompt
+#     if not messages:
+#         messages.append({
+#             "role": "system",
+#             "content": "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
+#                        "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
+#                        "nie próbuj odpowiadać z pamięci."
+#         })
+#
+#     messages.append({"role": "user", "content": question})
+#
+#     response = client.chat.completions.create(
+#         model=MODEL_NAME, messages=messages, tools=tools_definition, temperature=0.1
+#     )
+#     assistant_msg = response.choices[0].message
+#
+#     if not assistant_msg.tool_calls:
+#         if verbose:
+#             print(f"  Narzędzie: BRAK (LLM odpowiedział sam)\n")
+#             display(Markdown(assistant_msg.content))
+#         messages.append({"role": "assistant", "content": assistant_msg.content})
+#         return assistant_msg.content
+#
+#     messages.append(assistant_msg)
+#     n_calls = len(assistant_msg.tool_calls)
+#     for i, tool_call in enumerate(assistant_msg.tool_calls, 1):
+#         func_name = tool_call.function.name
+#         func_args = json.loads(tool_call.function.arguments)
+#         label = f"[{i}/{n_calls}] " if n_calls > 1 else ""
+#         if verbose:
+#             print(f"  {label}Narzędzie: {func_name}({func_args})")
+#         result = AVAILABLE_TOOLS.get(func_name, lambda **kw: "Nieznane narzędzie")(**func_args)
+#         if verbose:
+#             print(f"  {label}Wynik:     {result[:150]}")
+#         messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
+#
+#     final = client.chat.completions.create(
+#         model=MODEL_NAME, messages=messages, temperature=0.1
+#     )
+#     final_answer = final.choices[0].message.content
+#     messages.append({"role": "assistant", "content": final_answer})
+#
+#     if verbose:
+#         print()
+#         display(Markdown(final_answer))
+#     return final_answer
+#
+#
+# Przykład użycia w notebooku:
+#
+# history = []
+# chat_with_tools(history, "Jaka jest pogoda we Wrocławiu?")
+# chat_with_tools(history, "A jaka populacja tego miasta?")
+# chat_with_tools(history, "Znajdź coś o tym mieście na Wikipedii")
+# print(f"\nHistoria: {len(history)} wiadomości")
+
+
+# ══════════════════════════════════════════════════════════════════════
 # BUDOWANIE NOTEBOOKA
 # ══════════════════════════════════════════════════════════════════════
 
