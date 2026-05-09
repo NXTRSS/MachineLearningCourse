@@ -21,6 +21,7 @@ logs/
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # Wewnętrzne notatki i narzędzia prowadzącego (nie dla studentów)
 CLAUDE.md

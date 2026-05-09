@@ -3,6 +3,20 @@
 Źródło: Wikipedia — Prezydent Rzeczypospolitej Polskiej.
 Plik zawiera informacje o prezydentach III RP (od 1989 roku).
 
+> **⚠️ UWAGA DLA PROWADZĄCEGO / STUDENTA:**
+> W tym pliku celowo ukryto **2 zmyślone fakty** (w polach „Mało znany fakt"):
+> - **Kwaśniewski** — popiersie Kleopatry od ambasadora Egiptu (FIKCJA)
+> - **Duda** — kolekcja antycznych monet z czasów Juliusza Cezara (FIKCJA)
+>
+> Dlaczego? To pułapka dydaktyczna na warsztat Function Calling.
+> LLM przeszukuje ten plik narzędziem `search_presidents` i zwraca te „fakty"
+> jako prawdziwe — co demonstruje problem **„garbage in, garbage out"**:
+> jeśli źródło danych kłamie, LLM bezkrytycznie powtórzy kłamstwo.
+>
+> LLM NIE czyta tego nagłówka — parser (`load_presidents()`) bierze tylko
+> linie `### Imię` i `- **Klucz:** wartość`, więc ta uwaga jest niewidoczna
+> dla modelu.
+
 ---
 
 ## III Rzeczpospolita (od 1989)
