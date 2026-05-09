@@ -1000,6 +1000,7 @@ def test_1a(pytanie):
 # ═══ TESTUJ TUTAJ ═══
 test_1a("Jaka jest pogoda w Krakowie?")\
 """))
+cells.append(separator())
 
 cells.append(md("""\
 <div style="background:#fff3cd; border-left:4px solid #ffc107; padding:14px; border-radius:4px;">
@@ -1254,17 +1255,17 @@ tools_definition.append(
 )
 
 # --- TEST (nie zmieniaj) ---
-_test_result = get_population("Kraków")
+_test_result = get_population("Wrocław")
 if _test_result is None:
     print("\\033[1;31m⬆️ Uzupełnij funkcję get_population! Teraz zwraca None (pass).\\033[0m")
 elif "get_population" not in AVAILABLE_TOOLS:
     print("\\033[1;31m⬆️ Dodaj get_population do AVAILABLE_TOOLS!\\033[0m")
 else:
     print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
-    print(f"\\nTest bezpośredni: {get_population('Kraków')}")
+    print(f"\\nTest bezpośredni: {get_population('Wrocław')}")
     if client:
         print()
-        ask_with_tools("Ile mieszkańców ma Kraków?")\
+        ask_with_tools("Ile mieszkańców ma Wrocław?")\
 """))
 
 cells.append(h6_collapsed(
@@ -1301,10 +1302,10 @@ tools_definition.append(
 
 # --- TEST ---
 print(f"Mamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
-print(f"\\nTest bezpośredni: {get_population('Kraków')}")
+print(f"\\nTest bezpośredni: {get_population('Wrocław')}")
 if client:
     print()
-    ask_with_tools("Ile mieszkańców ma Kraków?")\
+    ask_with_tools("Ile mieszkańców ma Wrocław?")\
 """))
 cells.append(separator())
 
@@ -1334,13 +1335,14 @@ cells.append(student_stub("""\
 import wikipedia
 wikipedia.set_lang("pl")
 
-# Biblioteka wikipedia ma 3 kluczowe funkcje:
+# Biblioteka wikipedia:
 #   wikipedia.search("Kraków")     → lista tytułów: ["Kraków", "Kraków (ujednoznacznienie)", ...]
-#   wikipedia.page("Kraków")       → obiekt z polami: .title, .summary, .url
-#   wikipedia.summary("Kraków")    → sam tekst streszczenia (skrót od page().summary)
+#   wikipedia.page("Kraków")       → obiekt strony z polami:
+#       page.title   → "Kraków"
+#       page.summary → "Kraków – miasto na prawach powiatu..."  (pełne streszczenie)
+#       page.url     → "https://pl.wikipedia.org/wiki/Kraków"
 #
-# Uwaga: wikipedia.page() może rzucić DisambiguationError
-# (gdy hasło jest niejednoznaczne) — złap go w try/except.
+# Uwaga: wikipedia.page() może rzucić DisambiguationError — złap go w try/except.
 
 def search_wikipedia(query: str) -> str:
     \"\"\"Przeszukuje Wikipedię i zwraca tytuł + streszczenie artykułu.\"\"\"
@@ -1351,32 +1353,42 @@ def search_wikipedia(query: str) -> str:
     try:
         page = wikipedia.page(results[0])
     except wikipedia.DisambiguationError as e:
-        page = wikipedia.page(e.options[0])  # bierz pierwszą opcję
+        page = wikipedia.page(e.options[0])
 
-    # --- TUTAJ: złóż wynik z page.title, page.summary i page.url ---
+    # Mamy obiekt page — złóż z niego tekst do zwrócenia.
+    # Użyj page.title, page.summary (obetnij do 500 znaków: page.summary[:500])
+    # i page.url. Połącz je w jednego f-stringa oddzielonego enterami (\\n).
+    # Wzór:  f"{tytuł}\\n\\n{streszczenie}\\n\\nŹródło: {url}"
 
-    return ...  # Tutaj wpisz swój kod — zwróć f-string z tytułem, streszczeniem (~500 znaków) i URL
+    return f"{page.title}\\n\\n{page.summary[:500]}\\n\\nŹródło: {page.url}"
 
-# --- Rejestracja narzędzia (nie zmieniaj) ---
+# --- Rejestracja narzędzia ---
 AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
 
 class SearchWikipediaArgs(BaseModel):
-    query: str = Field(..., description="Zapytanie do Wikipedii, np. 'fotosynteza', 'Nikola Tesla'")
+
+    query: str = Field(..., description=...  # Tutaj wpisz opis argumentu — co to jest query?
+    )
 
 tools_definition.append(
-    make_tool("search_wikipedia",
-              "Przeszukuje Wikipedię i zwraca streszczenie artykułu. "
-              "Użyj gdy pytanie dotyczy wiedzy ogólnej, historii, nauki, geografii.",
-              SearchWikipediaArgs)
+    make_tool(
+        "search_wikipedia",
+
+        ...  # Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
+
+        SearchWikipediaArgs,
+    )
 )
 
 # --- TEST (nie zmieniaj) ---
 _test_result = search_wikipedia("Kraków")
-if _test_result is ... or _test_result is None:
-    print("\\033[1;31m⬆️ Uzupełnij return w search_wikipedia! Złóż f-string z page.title, page.summary i page.url.\\033[0m")
+if _test_result is None:
+    print("\\033[1;31m⬆️ Uzupełnij return w search_wikipedia!\\033[0m")
+elif "search_wikipedia" not in AVAILABLE_TOOLS:
+    print("\\033[1;31m⬆️ Dodaj search_wikipedia do AVAILABLE_TOOLS!\\033[0m")
 else:
     print("Test bezpośredni:")
-    print(search_wikipedia("Kraków"))
+    print(_test_result[:300])
     print(f"\\nMamy {len(AVAILABLE_TOOLS)} narzędzi: {list(AVAILABLE_TOOLS.keys())}")
     if client:
         print("\\nTest przez LLM:")
