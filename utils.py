@@ -744,3 +744,55 @@ def ensure_package(pip_name, import_name=None):
         f"Nie udało się zainstalować {pip_name}. "
         f"Spróbuj ręcznie: uv pip install {pip_name}  lub  pip install {pip_name}"
     )
+
+
+# ── Reasoning helpers (Function Calling) ─────────────────────────────
+# Modele LLM mogą zwracać tok myślenia (reasoning) w RÓŻNYCH atrybutach
+# w zależności od dostawcy/modelu:
+#   - reasoning_content (Qwen3, DeepSeek-R1)
+#   - reasoning (niektóre OpenAI-compatible)
+#   - thought / thinking (inne implementacje)
+#
+# Te helpery ujednolicają dostęp — wyciągają reasoning niezależnie od
+# tego, pod jakim atrybutem model go zwrócił.
+
+_REASONING_FIELDS = ('reasoning_content', 'reasoning', 'thought', 'thinking')
+
+
+def extract_reasoning(msg):
+    """
+    Wyciąga natywny tok myślenia (reasoning) z odpowiedzi LLM-a.
+
+    Modele takie jak Qwen3, DeepSeek-R1 zwracają reasoning w różnych
+    atrybutach. Ta funkcja sprawdza wszystkie znane nazwy i zwraca
+    pierwszą niepustą wartość (lub None).
+
+    Args:
+        msg: Obiekt wiadomości z response.choices[0].message
+
+    Returns:
+        str lub None — tok myślenia modelu, jeśli dostępny
+    """
+    return next(
+        (getattr(msg, f, None) for f in _REASONING_FIELDS if getattr(msg, f, None)),
+        None
+    )
+
+
+def print_reasoning(msg, max_chars=500):
+    """
+    Wyświetla natywny tok myślenia (reasoning) z odpowiedzi LLM-a.
+
+    Jeśli model zwrócił reasoning — wyświetla go z emoji 🧠.
+    Jeśli nie — nie wyświetla nic (nie rzuca błędu).
+
+    Args:
+        msg: Obiekt wiadomości z response.choices[0].message
+        max_chars: Maksymalna liczba znaków do wyświetlenia (domyślnie 500)
+    """
+    reasoning = extract_reasoning(msg)
+    if reasoning:
+        print(f"  🧠 Tok myślenia (reasoning):")
+        for line in str(reasoning)[:max_chars].split("\n"):
+            print(f"     {line}")
+        print()
