@@ -809,10 +809,54 @@ print(json.dumps(tools_definition[0], indent=2, ensure_ascii=False))\
 """))
 
 cells.append(code("""\
-def ask_with_tools(question, verbose=True):
+# ── Model ToolReasoning ──────────────────────────────────────────────
+# Niektóre modele (np. Qwen3) mają wbudowany tok myślenia (reasoning_content),
+# więc widzimy JAK model zdecydował o wyborze narzędzia.
+# Inne (np. Gemma) tego nie mają — odpowiadają od razu bez wglądu w "myślenie".
+#
+# Rozwiązanie: wymuszamy reasoning przez Structured Output (instructor).
+# Przed właściwym tool callem pytamy model: "Które narzędzie wybierasz i dlaczego?"
+# Model MUSI odpowiedzieć w formacie ToolReasoning — dzięki temu widzimy jego
+# rozumowanie nawet gdy nie ma natywnego reasoning.
+#
+# ⚠️ UWAGA: To są DWA OSOBNE zapytania do modelu — jedno o reasoning (instructor),
+# drugie o właściwy tool call (client). Model może teoretycznie podjąć RÓŻNE decyzje
+# w każdym z nich! W praktyce przy temperature=0.1 prawie zawsze się zgadzają,
+# ale warto o tym wiedzieć — to diagnostyka, nie sterowanie.
+
+class ToolReasoning(BaseModel):
+    thinking: str = Field(..., description="Krótkie uzasadnienie — dlaczego wybrałeś to narzędzie (1-2 zdania)")
+    needs_tool: bool = Field(..., description="Czy pytanie wymaga użycia narzędzia?")
+    tool_name: Optional[str] = Field(None, description="Nazwa narzędzia do użycia (lub None)")
+    confidence: float = Field(..., ge=0, le=1, description="Pewność wyboru w skali 0-1")
+
+
+def ask_with_tools(question, verbose=True, show_reasoning=False):
     if not client:
         print("LLM niedostępny.")
         return None
+
+    # ── Opcjonalny reasoning (dla modeli bez natywnego reasoning) ──
+    # Jeśli show_reasoning=True i mamy instructor_client, wymuszamy
+    # strukturalny reasoning PRZED właściwym tool callem.
+    if show_reasoning and instructor_client:
+        try:
+            reasoning = instructor_client.chat.completions.create(
+                model=MODEL_NAME,
+                response_model=ToolReasoning,
+                messages=[
+                    {"role": "system", "content":
+                     f"Masz dostępne narzędzia: {list(AVAILABLE_TOOLS.keys())}. "
+                     "Zdecyduj które narzędzie użyć (lub żadne)."},
+                    {"role": "user", "content": question}
+                ],
+            )
+            print(f"  🔍 Reasoning (wymuszony przez instructor):")
+            print(f"     Myślenie:   {reasoning.thinking}")
+            print(f"     Narzędzie:  {reasoning.tool_name or 'BRAK'} (pewność: {reasoning.confidence:.0%})")
+            print()
+        except Exception:
+            pass  # Nie blokujemy flow gdy reasoning się nie uda
 
     messages = [
         {"role": "system", "content":
@@ -828,7 +872,8 @@ def ask_with_tools(question, verbose=True):
 
     assistant_msg = response.choices[0].message
 
-    if verbose:
+    # Natywny reasoning (np. Qwen3) — wyświetlamy gdy jest, nie wymuszamy
+    if verbose and not show_reasoning:
         tok_myslenia = next((getattr(assistant_msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(assistant_msg, f, None)), None)
         if tok_myslenia:
             print(f"  🧠 Tok myślenia (reasoning):")
@@ -1560,56 +1605,40 @@ to zwykły tekst — LLM sobie z nim radzi. Ale **końcowa odpowiedź** LLM-a to
 Dzięki temu końcowa odpowiedź to nie tekst do parsowania, ale obiekt z polami: `verdict`, `confidence`, `source`.
 </div>"""))
 
+cells.append(md("""\
+### Wymuszony reasoning — podgląd myślenia modelu
+
+Pamiętasz, że w sekcji 2 zauważyliśmy: modele typu Qwen3 pokazują tok myślenia (`reasoning_content`),
+ale inne (np. Gemma) — nie?
+
+Teraz mamy narzędzie, żeby to obejść! Nasza funkcja `ask_with_tools()` ma parametr `show_reasoning=True`,
+który **przed właściwym tool callem** pyta model (przez instructor): *"Które narzędzie wybierasz i dlaczego?"*
+
+Model MUSI odpowiedzieć strukturalnie (obiekt `ToolReasoning`) — dzięki temu widzimy jego rozumowanie
+nawet gdy nie ma natywnego reasoning."""))
+
 cells.append(code("""\
-# instructor_client mamy od sekcji 2 — teraz go użyjemy do czegoś nowego
+# show_reasoning=True → wymuszamy strukturalny reasoning PRZED tool callem
+# Porównaj: bez show_reasoning widzielibyśmy tylko "Narzędzie: get_weather(...)"
+# Teraz widzimy też DLACZEGO model wybrał to narzędzie.
 
-class ToolReasoning(BaseModel):
-    thinking: str = Field(..., description="Krótkie uzasadnienie — dlaczego wybrałeś to narzędzie (1-2 zdania)")
-    needs_tool: bool = Field(..., description="Czy pytanie wymaga użycia narzędzia?")
-    tool_name: Optional[str] = Field(None, description="Nazwa narzędzia do użycia (lub None)")
-    confidence: float = Field(..., ge=0, le=1, description="Pewność wyboru w skali 0-1")
-
-if instructor_client:
-    reasoning = instructor_client.chat.completions.create(
-        model=MODEL_NAME,
-        response_model=ToolReasoning,
-        messages=[
-            {"role": "system", "content": f"Masz dostępne narzędzia: {list(AVAILABLE_TOOLS.keys())}. Zdecyduj które narzędzie użyć."},
-            {"role": "user", "content": "Jaka jest pogoda w Krakowie?"}
-        ],
-    )
-    print("LLM zdecydował STRUKTURALNIE:")
-    print(f"  Myślenie:   {reasoning.thinking}")
-    print(f"  Potrzebuje: {reasoning.needs_tool}")
-    print(f"  Narzędzie:  {reasoning.tool_name}")
-    print(f"  Pewność:    {reasoning.confidence:.0%}")
-else:
-    print("LLM niedostępny.")\
+if client:
+    ask_with_tools("Jaka jest pogoda we Wrocławiu?", show_reasoning=True)\
 """))
 
 cells.append(code("""\
-# Przetestujmy na różnych pytaniach:
+# Przetestujmy na różnych pytaniach — które narzędzie model wybierze?
 
-test_questions = [
-    "Ile to jest 2 do potęgi 10?",
-    "Kim był Lech Wałęsa?",
-    "Co to jest algorytm sortowania?",
-    "Jaka pogoda jest dzisiaj w Gdańsku?",
-]
-
-if instructor_client:
+if client:
+    test_questions = [
+        "Ile to jest 2 do potęgi 10?",
+        "Kim był Lech Wałęsa?",
+        "Jaka pogoda jest dzisiaj w Gdańsku?",
+    ]
     for q in test_questions:
-        r = instructor_client.chat.completions.create(
-            model=MODEL_NAME,
-            response_model=ToolReasoning,
-            messages=[
-                {"role": "system", "content": f"Masz narzędzia: {list(AVAILABLE_TOOLS.keys())}. Zdecyduj."},
-                {"role": "user", "content": q}
-            ],
-        )
-        tool_str = r.tool_name or "BRAK"
-        print(f"  {q}")
-        print(f"    → {tool_str} (pewność: {r.confidence:.0%}) — {r.thinking[:80]}")
+        print(f"{'═'*60}")
+        print(f"Pytanie: {q}\\n")
+        ask_with_tools(q, show_reasoning=True)
         print()\
 """))
 
