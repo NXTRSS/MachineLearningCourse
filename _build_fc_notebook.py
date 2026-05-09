@@ -1613,50 +1613,8 @@ ale **końcowa odpowiedź** LLM-a to wolny tekst. Co jeśli chcemy ją ustruktur
 2. **Structured Output** (`instructor_client` + `response_model=`) → formatujemy końcowy werdykt
 
 Dzięki temu końcowa odpowiedź to nie tekst do parsowania, ale obiekt z polami: `verdict`, `confidence`, `source`.
-</div>"""))
+</div>
 
-cells.append(md("""\
-### Wymuszony reasoning — podgląd myślenia modelu
-
-Pamiętasz, że w sekcji 2 zauważyliśmy: modele typu Qwen3 pokazują tok myślenia (`reasoning_content`),
-ale inne (np. Gemma) — nie?
-
-Teraz mamy narzędzie, żeby to obejść! Nasza funkcja `ask_with_tools()` ma parametr `show_reasoning=True`,
-który **przed właściwym tool callem** pyta model (przez instructor): *"Które narzędzie wybierasz i dlaczego?"*
-
-Model MUSI odpowiedzieć strukturalnie (obiekt `ToolReasoning`) — dzięki temu widzimy jego rozumowanie
-nawet gdy nie ma natywnego reasoning."""))
-
-cells.append(code("""\
-# show_reasoning=True → wymuszamy strukturalny reasoning PRZED tool callem
-# Porównaj: bez show_reasoning widzielibyśmy tylko "Narzędzie: get_weather(...)"
-# Teraz widzimy też DLACZEGO model wybrał to narzędzie.
-
-if client:
-    ask_with_tools("Jaka jest pogoda we Wrocławiu?", show_reasoning=True)\
-"""))
-
-cells.append(code("""\
-# Przetestujmy na różnych pytaniach — które narzędzie model wybierze?
-
-if client:
-    test_questions = [
-        "Ile to jest 2 do potęgi 10?",
-        "Kim był Lech Wałęsa?",
-        "Jaka pogoda jest dzisiaj w Gdańsku?",
-    ]
-    for q in test_questions:
-        print(f"{'═'*60}")
-        print(f"Pytanie: {q}\\n")
-        ask_with_tools(q, show_reasoning=True)
-        print()\
-"""))
-
-# ══════════════════════════════════════════════════════════════════════
-# ĆWICZENIE 4: FACTCHECK
-# ══════════════════════════════════════════════════════════════════════
-
-cells.append(md("""\
 ### Ćwiczenie 4: FactCheck — zweryfikuj twierdzenie strukturalnie
 
 Połączmy function calling ze Structured Output!
