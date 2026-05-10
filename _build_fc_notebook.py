@@ -1021,6 +1021,8 @@ test_tools = copy.deepcopy(tools_definition)
 test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"\
 """))
 
+cells.append(md("##### "))
+
 # --- test_1a: jedna definicja poniżej stubu i rozwiązania ---
 cells.append(code("""\
 # --- Test ćwiczenia 1A (uruchom po uzupełnieniu komórki powyżej) ---
@@ -1286,18 +1288,21 @@ AVAILABLE_TOOLS["get_population"] = get_population
 class GetPopulationArgs(BaseModel):
     city: str = Field(..., description="Nazwa miasta, np. 'Kraków'")
 
-tools_definition.append(
-    make_tool("get_population",
+_population_desc = ...,  # Tutaj wpisz swój kod — opis narzędzia (1 zdanie, po polsku)
 
-              ...,  # Tutaj wpisz swój kod — opis narzędzia (1 zdanie, po polsku)
-
-              GetPopulationArgs)
-)
+if _population_desc is ...:
+    print("\\033[1;33m⬆️ Uzupełnij opis narzędzia powyżej!\\033[0m")
+else:
+    tools_definition.append(
+        make_tool("get_population", _population_desc, GetPopulationArgs)
+    )
 
 # --- TEST (nie zmieniaj) ---
 _test_result = get_population("Wrocław")
 if _test_result is None:
     print("\\033[1;31m⬆️ Uzupełnij funkcję get_population! Teraz zwraca None (pass).\\033[0m")
+elif _population_desc is ...:
+    pass  # komunikat już wyświetlony powyżej
 elif "get_population" not in AVAILABLE_TOOLS:
     print("\\033[1;31m⬆️ Dodaj get_population do AVAILABLE_TOOLS!\\033[0m")
 else:
@@ -1414,20 +1419,21 @@ class SearchWikipediaArgs(BaseModel):
     query: str = Field(..., description=...  # ✏️ Tutaj wpisz opis argumentu — co to jest query?
     )
 
-tools_definition.append(
-    make_tool(
-        "search_wikipedia",
+_wikipedia_desc = ...,  # ✏️ Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
 
-        ...,  # ✏️ Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
-
-        SearchWikipediaArgs,
+if _wikipedia_desc is ...:
+    print("\\033[1;33m⬆️ Uzupełnij opis narzędzia powyżej!\\033[0m")
+else:
+    tools_definition.append(
+        make_tool("search_wikipedia", _wikipedia_desc, SearchWikipediaArgs)
     )
-)
 
 # --- TEST (nie zmieniaj) ---
 _test_result = search_wikipedia("Wrocław")
 if _test_result is None or _test_result is ...:
     print("\\033[1;31m⬆️ Uzupełnij return w search_wikipedia!\\033[0m")
+elif _wikipedia_desc is ...:
+    pass  # komunikat już wyświetlony powyżej
 elif "search_wikipedia" not in AVAILABLE_TOOLS:
     print("\\033[1;31m⬆️ Dodaj search_wikipedia do AVAILABLE_TOOLS!\\033[0m")
 else:
