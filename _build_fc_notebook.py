@@ -1949,9 +1949,13 @@ if client:
     print("═"*60)
     agent("Ile lat miał Aleksander Kwaśniewski gdy skończył kadencję? Oblicz ile to w przybliżeniu dni.")
 
-    print("\\n\\nTest 2: Wikipedia + pogoda")
+    print("\\n\\nTest 2: Pogoda + kalkulator")
     print("═"*60)
-    agent("Co to jest fotosynteza i jaka jest pogoda w Krakowie?")\
+    agent("Jaka jest temperatura we Wrocławiu? Przelicz ją na stopnie Fahrenheita.")
+
+    print("\\n\\nTest 3: Prezydenci + Wikipedia")
+    print("═"*60)
+    agent("Który prezydent Polski skończył Uniwersytet Jagielloński? Znajdź na Wikipedii kiedy założono tę uczelnię.")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
