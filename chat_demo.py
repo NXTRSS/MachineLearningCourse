@@ -189,7 +189,7 @@ class WeatherArgs(BaseModel):
 
 AVAILABLE_TOOLS["get_weather"] = get_weather
 tools_definition.append(
-    make_tool("get_weather", "Sprawdza aktualną pogodę w podanym mieście (temperatura, opis, wilgotność).", WeatherArgs)
+    make_tool("get_weather", "Sprawdza aktualną pogodę w podanym mieście (temperatura, opis, wilgotność, godzina pomiaru).", WeatherArgs)
 )
 
 

@@ -810,7 +810,7 @@ class SearchPresidentsArgs(BaseModel):
 # Składamy tools_definition za pomocą make_tool()
 tools_definition = [
     make_tool("get_weather",
-              "Sprawdza aktualną pogodę w podanym mieście. Użyj gdy użytkownik pyta o pogodę.",
+              "Sprawdza aktualną pogodę w podanym mieście (temperatura, opis, wilgotność, godzina pomiaru).",
               GetWeatherArgs),
     make_tool("calculate",
               "Wykonuje obliczenie matematyczne. Użyj gdy trzeba coś policzyć.",
