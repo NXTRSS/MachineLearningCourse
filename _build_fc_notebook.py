@@ -514,6 +514,8 @@ test_questions = [
     "Ile nóg ma pająk?",
 ]
 
+results = []  # ← zbieramy obiekty do listy!
+
 if instructor_client:
     for q in test_questions:
         print(f"\\nPytanie: \\"{q}\\"")
@@ -522,6 +524,7 @@ if instructor_client:
             response_model=MaybeCityInfo,
             messages=[{"role": "user", "content": q}],
         )
+        results.append(result)
         # ↓ To NIE jest tekst! To obiekt Pythona z polami ↓
         print(f"  Typ:    {type(result).__name__}")
         print(f"  Obiekt: {result}")
@@ -535,6 +538,19 @@ if instructor_client:
             print(f"  ─── LLM odpowiedział: to nie miasto ───")
             print(f"  result.found         → {result.found}")
             print(f"  result.error_message → {result.error_message}")
+
+    # ── Kluczowy moment: to są OBIEKTY, nie tekst! ──
+    print(f"\\n{'═'*60}")
+    print(f"Mamy {len(results)} obiektów w liście 'results':")
+    cities = [r for r in results if r.found]
+    print(f"  Znalezione miasta: {[c.name for c in cities]}")
+    if cities:
+        print(f"\\n  Bierzemy pierwsze miasto z listy:")
+        print(f"    results[0].name       → {cities[0].name}")
+        print(f"    results[0].famous_for → {cities[0].famous_for}")
+        print(f"\\n  Populacja jako int (nie tekst!) — można liczyć:")
+        total = sum(c.population_approx for c in cities)
+        print(f"    sum(c.population_approx for c in cities) = {total:_}")
 else:
     print("instructor_client niedostępny.")\
 """))
