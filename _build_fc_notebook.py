@@ -1283,7 +1283,7 @@ class GetPopulationArgs(BaseModel):
 tools_definition.append(
     make_tool("get_population",
 
-              ...  # Tutaj wpisz swój kod — opis narzędzia (1 zdanie, po polsku)
+              ...,  # Tutaj wpisz swój kod — opis narzędzia (1 zdanie, po polsku)
 
               GetPopulationArgs)
 )
@@ -1412,7 +1412,7 @@ tools_definition.append(
     make_tool(
         "search_wikipedia",
 
-        ...  # ✏️ Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
+        ...,  # ✏️ Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
 
         SearchWikipediaArgs,
     )
