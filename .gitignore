@@ -40,3 +40,4 @@ search_gridsearch_log.txt
 bayesian_search.py
 bayesian_results.json
 .venv_dev/
+FUNCTION_CALLING_STATUS.md
