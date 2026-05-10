@@ -994,7 +994,13 @@ test_tools = copy.deepcopy(tools_definition)
 
 # --- TUTAJ ZMIEŃ description ---
 
-test_tools[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"\
+test_tools[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"
+
+# --- Test ---
+if test_tools[0]["function"]["description"] is ...:
+    print("\\033[1;31m⬆️ Uzupełnij description powyżej!\\033[0m")
+else:
+    test_1a("Jaka jest pogoda we Wrocławiu?")\
 """))
 
 cells.append(h6_collapsed(
@@ -1019,11 +1025,7 @@ test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydent
 cells.append(code("""\
 # --- Test ćwiczenia 1A (uruchom po uzupełnieniu komórki powyżej) ---
 def test_1a(pytanie):
-    new_desc = test_tools[0]["function"]["description"]
-    if new_desc is ...:
-        print("\\033[1;31m⬆️ Uzupełnij description powyżej!\\033[0m")
-        return
-    print(f"Nowy opis get_weather: '{new_desc}'")
+    print(f"Nowy opis get_weather: '{test_tools[0]['function']['description']}'")
     print(f"Ale nazwa to nadal:   '{test_tools[0]['function']['name']}'")
     print(f"Pytanie: '{pytanie}'")
     print()
