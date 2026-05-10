@@ -139,12 +139,15 @@ Szczegóły instalacji: patrz `setup_local_llm.ipynb` lub `docs/LOKALNE_LLM.md`
 **Function calling działa najlepiej z modelami:** `qwen3.5:4b+`, `gemma4:4b+`, `qwen3:8b+`"""))
 
 cells.append(code("""\
-from utils import connect_llm
+from utils import connect_llm, extract_reasoning, print_reasoning, clean_content
 
 # Jeśli nie masz lokalnego LLM-a, wpisz adres serwera prowadzącego (podany na zajęciach):
 LECTURER_SERVER = "http://ADRES_SERWERA:PORT"  # ← prowadzący poda na zajęciach
 
-client, instructor_client, MODEL_NAME = connect_llm(lecturer_server=LECTURER_SERVER)
+client, instructor_client, MODEL_NAME = connect_llm(
+    lecturer_server=LECTURER_SERVER,
+    # model="gemma",  # ← odkomentuj, by wybrać konkretny model (np. "qwen", "llama")
+)
 
 # connect_llm zwraca DWA klienty:
 #   client            → do function calling (LLM wybiera narzędzia)
@@ -157,17 +160,6 @@ if client:
     print("Mamy DWA klienty:")
     print("  client            → do function calling (LLM wybiera narzędzia)")
     print("  instructor_client → do structured output (LLM odpowiada w formacie Pydantic)")\
-"""))
-
-cells.append(code("""\
-# Nadpisanie modelu na czas testów (zakomentuj przed mergem na main):
-
-from openai import OpenAI
-import instructor
-client = OpenAI(base_url="http://localhost:4242/v1", api_key="lm-studio")
-instructor_client = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
-MODEL_NAME = "gemma-4-e4b-it-mlx"
-print(f"Nadpisano! Używam: {MODEL_NAME}")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
@@ -264,15 +256,11 @@ def calculate_function_call(user_prompt):
 
     msg = response.choices[0].message
 
-    tok_myslenia = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
-    if tok_myslenia:
-        print(f"  🧠 Tok myślenia (reasoning):")
-        for line in str(tok_myslenia)[:500].split("\\n"):
-            print(f"     {line}")
-        print()
+    print_reasoning(msg)
 
-    if msg.content and msg.tool_calls:
-        print(f"  💬 LLM mówi: {msg.content[:300]}")
+    content = clean_content(msg)
+    if content and msg.tool_calls:
+        print(f"  💬 LLM mówi: {content[:300]}")
         print()
 
     if msg.tool_calls:
@@ -298,9 +286,9 @@ def calculate_function_call(user_prompt):
         print()
         box("KROK 4: LLM formułuje ostateczną odpowiedź")
         print()
-        display(Markdown(final.choices[0].message.content))
+        display(Markdown(clean_content(final.choices[0].message)))
     else:
-        print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
+        print(f"  LLM odpowiedział bez narzędzia: {(content or '')[:200]}")
 
 # --- Uruchomienie ---
 calculate_function_call("Ile to jest 17 razy 23?")\
@@ -327,9 +315,9 @@ Kluczowe: **LLM nie liczy sam** — prosi NASZ kod o obliczenie. My kontrolujemy
 
 <div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px; margin-top:10px;">
 
-**🧠 Tok myślenia (reasoning):** Niektóre modele (np. Qwen3) pokazują swój wewnętrzny tok myślenia
-w polu `reasoning_content`. Inne (np. Gemma) tego nie robią — to normalne!
-Wyświetlamy go gdy jest dostępny, ale jego brak nie oznacza błędu.
+**🧠 Tok myślenia (reasoning):** Modele mogą pokazywać swój wewnętrzny tok myślenia na różne sposoby:
+Qwen3 → osobne pole `reasoning_content`, Gemma-4 → tokeny `<|channel>thought` w odpowiedzi.
+Nasza funkcja `extract_reasoning()` z `utils.py` wyciąga reasoning niezależnie od formatu.
 
 </div>
 
@@ -812,19 +800,13 @@ print(json.dumps(tools_definition[0], indent=2, ensure_ascii=False))\
 
 cells.append(code("""\
 # ── Model ToolReasoning ──────────────────────────────────────────────
-# Niektóre modele (np. Qwen3) mają wbudowany tok myślenia (reasoning_content),
-# więc widzimy JAK model zdecydował o wyborze narzędzia.
-# Inne (np. Gemma) tego nie mają — odpowiadają od razu bez wglądu w "myślenie".
+# Modele mogą mieć wbudowany tok myślenia:
+#   - Qwen3 → atrybut reasoning_content
+#   - Gemma-4 → tokeny <|channel>thought w msg.content
+# Jeśli model NIE ma natywnego reasoning — wymuszamy go przez instructor.
 #
-# Rozwiązanie: wymuszamy reasoning przez Structured Output (instructor).
-# Przed właściwym tool callem pytamy model: "Które narzędzie wybierasz i dlaczego?"
-# Model MUSI odpowiedzieć w formacie ToolReasoning — dzięki temu widzimy jego
-# rozumowanie nawet gdy nie ma natywnego reasoning.
-#
-# ⚠️ UWAGA: To są DWA OSOBNE zapytania do modelu — jedno o reasoning (instructor),
-# drugie o właściwy tool call (client). Model może teoretycznie podjąć RÓŻNE decyzje
-# w każdym z nich! W praktyce przy temperature=0.1 prawie zawsze się zgadzają,
-# ale warto o tym wiedzieć — to diagnostyka, nie sterowanie.
+# ⚠️ UWAGA: Wymuszony reasoning = DWA OSOBNE zapytania — jedno o reasoning,
+# drugie o właściwy tool call. Model może teoretycznie podjąć RÓŻNE decyzje!
 
 class ToolReasoning(BaseModel):
     thinking: str = Field(..., description="Krótkie uzasadnienie — dlaczego wybrałeś to narzędzie (1-2 zdania)")
@@ -837,29 +819,6 @@ def ask_with_tools(question, verbose=True, show_reasoning=True):
     if not client:
         print("LLM niedostępny.")
         return None
-
-    # ── Opcjonalny reasoning (dla modeli bez natywnego reasoning) ──
-    # Jeśli show_reasoning=True i mamy instructor_client, wymuszamy
-    # strukturalny reasoning PRZED właściwym tool callem.
-    if show_reasoning and instructor_client:
-        try:
-            reasoning = instructor_client.chat.completions.create(
-                model=MODEL_NAME,
-                response_model=ToolReasoning,
-                messages=[
-                    {"role": "system", "content":
-                     f"Masz dostępne narzędzia: {list(AVAILABLE_TOOLS.keys())}. "
-                     "Zdecyduj które narzędzie użyć (lub żadne). "
-                     "Odpowiedz PŁASKIM JSON-em z polami: thinking, needs_tool, tool_name, confidence."},
-                    {"role": "user", "content": question}
-                ],
-            )
-            print(f"  🔍 Reasoning (wymuszony przez instructor):")
-            print(f"     Myślenie:   {reasoning.thinking}")
-            print(f"     Narzędzie:  {reasoning.tool_name or 'BRAK'} (pewność: {reasoning.confidence:.0%})")
-            print()
-        except Exception:
-            pass  # Nie blokujemy flow gdy reasoning się nie uda
 
     messages = [
         {"role": "system", "content":
@@ -875,25 +834,42 @@ def ask_with_tools(question, verbose=True, show_reasoning=True):
 
     assistant_msg = response.choices[0].message
 
-    # Natywny reasoning (np. Qwen3) — wyświetlamy gdy jest, nie wymuszamy
-    if verbose and not show_reasoning:
-        tok_myslenia = next((getattr(assistant_msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(assistant_msg, f, None)), None)
-        if tok_myslenia:
-            print(f"  🧠 Tok myślenia (reasoning):")
-            for line in str(tok_myslenia)[:500].split("\\n"):
-                print(f"     {line}")
-            print()
+    # ── Reasoning: natywny (Qwen3, Gemma-4) → fallback na instructor ──
+    if verbose and show_reasoning:
+        native_reasoning = extract_reasoning(assistant_msg)
+        if native_reasoning:
+            print_reasoning(assistant_msg)
+        elif instructor_client:
+            try:
+                forced = instructor_client.chat.completions.create(
+                    model=MODEL_NAME,
+                    response_model=ToolReasoning,
+                    messages=[
+                        {"role": "system", "content":
+                         f"Masz dostępne narzędzia: {list(AVAILABLE_TOOLS.keys())}. "
+                         "Zdecyduj które narzędzie użyć (lub żadne). "
+                         "Odpowiedz PŁASKIM JSON-em z polami: thinking, needs_tool, tool_name, confidence."},
+                        {"role": "user", "content": question}
+                    ],
+                )
+                print(f"  🔍 Reasoning (wymuszony przez instructor):")
+                print(f"     Myślenie:   {forced.thinking}")
+                print(f"     Narzędzie:  {forced.tool_name or 'BRAK'} (pewność: {forced.confidence:.0%})")
+                print()
+            except Exception:
+                pass
 
-    if verbose and assistant_msg.content and assistant_msg.tool_calls:
-        print(f"  💬 LLM mówi: {assistant_msg.content[:300]}")
+    content = clean_content(assistant_msg)
+    if verbose and content and assistant_msg.tool_calls:
+        print(f"  💬 LLM mówi: {content[:300]}")
         print()
 
     if not assistant_msg.tool_calls:
         if verbose:
             print(f"  Narzędzie: BRAK (LLM odpowiedział sam)")
             print()
-            display(Markdown(assistant_msg.content))
-        return assistant_msg.content
+            display(Markdown(content or ""))
+        return content
 
     messages.append(assistant_msg)
     n_calls = len(assistant_msg.tool_calls)
@@ -911,11 +887,11 @@ def ask_with_tools(question, verbose=True, show_reasoning=True):
         messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
 
     final = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.1)
-    final_answer = final.choices[0].message.content
+    final_answer = clean_content(final.choices[0].message)
 
     if verbose:
         print()
-        display(Markdown(final_answer))
+        display(Markdown(final_answer or ""))
     return final_answer
 
 print("Funkcja ask_with_tools() gotowa!")\
@@ -988,11 +964,12 @@ def test_1a(pytanie):
                 model=MODEL_NAME, messages=messages, tools=test_tools, temperature=0.1
             )
             msg = response.choices[0].message
+            print_reasoning(msg)
             if msg.tool_calls:
                 tc = msg.tool_calls[0]
                 print(f"  LLM wybrał: {tc.function.name}({tc.function.arguments})")
             else:
-                print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
+                print(f"  LLM odpowiedział bez narzędzia: {(clean_content(msg) or '')[:200]}")
         except Exception as e:
             print(f"\\033[1;33m⚠️ Model zwrócił błąd: {e}\\033[0m")
             print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")
@@ -1036,11 +1013,12 @@ def test_1a(pytanie):
                 model=MODEL_NAME, messages=messages, tools=test_tools, temperature=0.1
             )
             msg = response.choices[0].message
+            print_reasoning(msg)
             if msg.tool_calls:
                 tc = msg.tool_calls[0]
                 print(f"  LLM wybrał: {tc.function.name}({tc.function.arguments})")
             else:
-                print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
+                print(f"  LLM odpowiedział bez narzędzia: {(clean_content(msg) or '')[:200]}")
         except Exception as e:
             print(f"\\033[1;33m⚠️ Model zwrócił błąd: {e}\\033[0m")
             print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")
@@ -1165,12 +1143,7 @@ if client:
         )
         msg = response.choices[0].message
 
-        tok = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
-        if tok:
-            print(f"  🧠 Tok myślenia (natywny):")
-            for line in str(tok)[:500].split("\\n"):
-                print(f"     {line}")
-            print()
+        print_reasoning(msg)
 
         if msg.tool_calls:
             tc = msg.tool_calls[0]
@@ -1200,7 +1173,7 @@ if client:
                     print("  🤦 CICHY BŁĄD! Pytaliśmy o miasto, a dostaliśmy pogodę.")
                     print("     Żadnego errora — ale odpowiedź jest kompletnie nie na temat!")
         else:
-            print(f"  LLM odpowiedział bez narzędzia: {msg.content[:200]}")
+            print(f"  LLM odpowiedział bez narzędzia: {(clean_content(msg) or '')[:200]}")
         print()
 else:
     print("LLM niedostępny.")\
@@ -1832,22 +1805,19 @@ def agent(question, max_steps=6):
 
         msg = response.choices[0].message
 
-        tok_myslenia = next((getattr(msg, f, None) for f in ('reasoning_content', 'reasoning', 'thought', 'thinking') if getattr(msg, f, None)), None)
-        if tok_myslenia:
-            print(f"\\n  🧠 Tok myślenia (reasoning):")
-            for line in str(tok_myslenia)[:500].split("\\n"):
-                print(f"     {line}")
+        print_reasoning(msg)
 
-        if msg.content and msg.tool_calls:
-            print(f"  💬 LLM mówi: {msg.content[:300]}")
+        content = clean_content(msg)
+        if content and msg.tool_calls:
+            print(f"  💬 LLM mówi: {content[:300]}")
             print()
 
         if not msg.tool_calls:
             print(f"\\n  Krok {step+1}: LLM generuje odpowiedź")
             print(f"  {'─'*50}")
             print()
-            display(Markdown(msg.content))
-            return msg.content
+            display(Markdown(content or ""))
+            return content
 
         messages.append(msg)
         for tool_call in msg.tool_calls:
@@ -2248,12 +2218,15 @@ def chat_with_tools(messages, question, verbose=True):
     )
     assistant_msg = response.choices[0].message
 
+    print_reasoning(assistant_msg)
+    content = clean_content(assistant_msg)
+
     if not assistant_msg.tool_calls:
         if verbose:
             print(f"  Narzędzie: BRAK (LLM odpowiedział sam)\\n")
-            display(Markdown(assistant_msg.content))
-        messages.append({"role": "assistant", "content": assistant_msg.content})
-        return assistant_msg.content
+            display(Markdown(content or ""))
+        messages.append({"role": "assistant", "content": content})
+        return content
 
     messages.append(assistant_msg)
     n_calls = len(assistant_msg.tool_calls)
@@ -2271,12 +2244,12 @@ def chat_with_tools(messages, question, verbose=True):
     final = client.chat.completions.create(
         model=MODEL_NAME, messages=messages, temperature=0.1
     )
-    final_answer = final.choices[0].message.content
+    final_answer = clean_content(final.choices[0].message)
     messages.append({"role": "assistant", "content": final_answer})
 
     if verbose:
         print()
-        display(Markdown(final_answer))
+        display(Markdown(final_answer or ""))
     return final_answer
 
 print("Funkcja chat_with_tools() gotowa!")\
