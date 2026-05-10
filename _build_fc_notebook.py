@@ -146,7 +146,7 @@ LECTURER_SERVER = "http://ADRES_SERWERA:PORT"  # ← prowadzący poda na zajęci
 
 client, instructor_client, MODEL_NAME = connect_llm(
     lecturer_server=LECTURER_SERVER,
-    # model="gemma",  # ← odkomentuj, by wybrać konkretny model (np. "qwen", "llama")
+    # model="gemma-4-e4b",  # ← odkomentuj, by wybrać konkretny model (np. "qwen", "llama")
 )
 
 # connect_llm zwraca DWA klienty:
@@ -160,6 +160,27 @@ if client:
     print("Mamy DWA klienty:")
     print("  client            → do function calling (LLM wybiera narzędzia)")
     print("  instructor_client → do structured output (LLM odpowiada w formacie Pydantic)")\
+"""))
+
+cells.append(code("""\
+# ── System prompt — wspólny dla wszystkich funkcji ──────────────────
+# Definiujemy go raz, w jednym miejscu. Dzięki temu:
+#   1. Łatwo zmienić zachowanie WSZYSTKICH funkcji naraz
+#   2. Studenci widzą, że system prompt to konfiguracja, nie magia
+#   3. Unikamy copy-paste tego samego tekstu w 7 miejscach
+#
+# <|think|> na początku → włącza natywny tok myślenia w Gemma-4.
+# Inne modele (Qwen3, Llama) go zignorują — nie przeszkadza.
+
+DEFAULT_SYSTEM_PROMPT = (
+    "<|think|>"
+    "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
+    "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
+    "nie próbuj odpowiadać z pamięci."
+)
+
+print(f"System prompt ({len(DEFAULT_SYSTEM_PROMPT)} znaków):")
+print(f"  {DEFAULT_SYSTEM_PROMPT[:80]}...")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
@@ -244,9 +265,7 @@ def calculate_function_call(user_prompt):
     print(f"  → Wysyłam do {MODEL_NAME}...\\n")
 
     messages = [
-        {"role": "system", "content":
-         "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
-         "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
+        {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt}
     ]
 
@@ -821,10 +840,7 @@ def ask_with_tools(question, verbose=True, show_reasoning=True):
         return None
 
     messages = [
-        {"role": "system", "content":
-         "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
-         "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
-         "nie próbuj odpowiadać z pamięci."},
+        {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
         {"role": "user", "content": question}
     ]
 
@@ -954,9 +970,7 @@ def test_1a(pytanie):
     print()
     if client:
         messages = [
-            {"role": "system", "content":
-             "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
-             "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
+            {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
             {"role": "user", "content": pytanie}
         ]
         try:
@@ -1003,9 +1017,7 @@ def test_1a(pytanie):
     print()
     if client:
         messages = [
-            {"role": "system", "content":
-             "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
-             "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
+            {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
             {"role": "user", "content": pytanie}
         ]
         try:
@@ -1132,9 +1144,7 @@ if client:
                 pass
 
         messages = [
-            {"role": "system", "content":
-             "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
-             "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy."},
+            {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
             {"role": "user", "content": question}
         ]
 
@@ -1787,11 +1797,7 @@ def agent(question, max_steps=6):
         return
 
     messages = [
-        {"role": "system", "content":
-         "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
-         "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
-         "nie próbuj odpowiadać z pamięci. "
-         "Możesz wywołać wiele narzędzi po kolei."},
+        {"role": "system", "content": DEFAULT_SYSTEM_PROMPT + " Możesz wywołać wiele narzędzi po kolei."},
         {"role": "user", "content": question}
     ]
 
@@ -2204,12 +2210,7 @@ def chat_with_tools(messages, question, verbose=True):
 
     # Przy pierwszym pytaniu dodaj system prompt
     if not messages:
-        messages.append({
-            "role": "system",
-            "content": "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
-                       "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
-                       "nie próbuj odpowiadać z pamięci."
-        })
+        messages.append({"role": "system", "content": DEFAULT_SYSTEM_PROMPT})
 
     messages.append({"role": "user", "content": question})
 

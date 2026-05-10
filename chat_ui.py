@@ -167,7 +167,7 @@ def launch_chat(
     # ── Przykładowe pytania ──
     examples = [
         "Jaka jest pogoda we Wrocławiu?",
-        "Opowiedz mi jakiś mało znany fakt o polskim prezydencie.",
+        "Opowiedz mi jakiś mało znany fakt o Andrzeju Dudzie.",
         "Jaki jest aktualny kurs dolara do złotówki?",
         "Znajdź informacje o Nikoli Tesli na Wikipedii.",
     ]
