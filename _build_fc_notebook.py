@@ -1288,7 +1288,7 @@ AVAILABLE_TOOLS["get_population"] = get_population
 class GetPopulationArgs(BaseModel):
     city: str = Field(..., description="Nazwa miasta, np. 'Kraków'")
 
-_population_desc = ...,  # Tutaj wpisz swój kod — opis narzędzia (1 zdanie, po polsku)
+_population_desc = ...  # Tutaj wpisz swój kod — opis narzędzia (1 zdanie, po polsku)
 
 if _population_desc is ...:
     print("\\033[1;33m⬆️ Uzupełnij opis narzędzia powyżej!\\033[0m")
@@ -1419,7 +1419,7 @@ class SearchWikipediaArgs(BaseModel):
     query: str = Field(..., description=...  # ✏️ Tutaj wpisz opis argumentu — co to jest query?
     )
 
-_wikipedia_desc = ...,  # ✏️ Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
+_wikipedia_desc = ...  # ✏️ Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
 
 if _wikipedia_desc is ...:
     print("\\033[1;33m⬆️ Uzupełnij opis narzędzia powyżej!\\033[0m")
