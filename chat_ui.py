@@ -27,6 +27,7 @@ def launch_chat(
     instructor_client=None,
     max_steps=6,
     share=False,
+    reasoning="all",
 ):
     """
     Uruchamia Gradio chat UI z Function Calling.
@@ -127,13 +128,14 @@ def launch_chat(
             msg = response.choices[0].message
 
             # ── Natywny reasoning (Qwen3, DeepSeek-R1, Gemma-4 channel) ──
-            reasoning = extract_reasoning(msg)
+            show_this = (reasoning == "all") or (reasoning == "first" and step == 0)
+            r = extract_reasoning(msg)
             msg_content = clean_content(msg)
-            if reasoning:
+            if r and show_this:
                 history.append(
                     {
                         "role": "assistant",
-                        "content": str(reasoning)[:800],
+                        "content": str(r)[:800],
                         "metadata": {"title": "🧠 Tok myślenia"},
                     }
                 )

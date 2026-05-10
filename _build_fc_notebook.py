@@ -166,21 +166,6 @@ if client:
 """))
 
 cells.append(code("""\
-# Nadpisanie modelu na czas testów (zakomentuj przed mergem na main):
-# connect_llm wybiera DOMYŚLNIE najmocniejszy dostępny model.
-# Argument `model=` to partial match — np. "gemma" wybierze pierwszy znaleziony
-# model z "gemma" w nazwie (przydatne do szybkich odpowiedzi / testów).
-
-client, instructor_client, MODEL_NAME = connect_llm(
-    lecturer_server=LECTURER_SERVER,
-    api_key=API_KEY,
-    # model="gemma",  # ← zmień na np. "qwen" / "llama" lub usuń, by zostawić auto
-    # backend="ollama",  # ← odkomentuj, by pominąć LM Studio
-)
-print(f"Nadpisano! Używam: {MODEL_NAME}")\
-"""))
-
-cells.append(code("""\
 # ── System prompt — wspólny dla wszystkich funkcji ──────────────────
 # Definiujemy go raz, w jednym miejscu. Dzięki temu:
 #   1. Łatwo zmienić zachowanie WSZYSTKICH funkcji naraz
