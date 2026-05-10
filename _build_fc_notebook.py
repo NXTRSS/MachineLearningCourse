@@ -419,6 +419,29 @@ cells.append(md("""\
 
 Od tej pory będziemy definiować narzędzia przez **modele Pydantic + `make_tool()`**.
 
+</div>
+
+<div style="background:#e8f4f8; border-left:4px solid #17a2b8; padding:12px; border-radius:4px; margin-top:10px;">
+
+**💡 Dlaczego jawne `make_tool()`, a nie magia?**
+
+W produkcji nikt nie pisze `make_tool()` ręcznie — biblioteki takie jak **LangChain** potrafią
+wyciągnąć nazwę, opis i schemat automatycznie z docstringa i type hints:
+
+```python
+# LangChain — dekorator @tool robi wszystko za Ciebie:
+from langchain.tools import tool
+
+@tool
+def get_weather(city: str) -> str:
+    \"\"\"Sprawdza aktualną pogodę w podanym mieście.\"\"\"
+    ...
+```
+
+My celowo **pokazujemy bebechy** — żebyście widzieli co dokładnie LLM dostaje od naszego kodu.
+Dzięki temu w ćwiczeniu 1 będziecie mogli celowo zmienić `description` i zobaczyć jak to wpływa
+na zachowanie modelu. Z magicznym dekoratorem nie byłoby tego widać.
+
 </div>"""))
 
 # === 3b: INSTRUCTOR DEMO ===
@@ -690,7 +713,7 @@ def get_weather(city: str) -> str:
         hum = current["humidity"]
         obs_time = current.get("localObsDateTime", "")
         time_info = f", dane z {obs_time}" if obs_time else ""
-        return f"{city}: {temp}°C, {cond}, wilgotność {hum}%{time_info} (źródło: wttr.in)"
+        return f"{city}: {temp}°C, {cond}, wilgotność {hum}%{time_info} (wttr.in)"
     except Exception:
         pass
 
