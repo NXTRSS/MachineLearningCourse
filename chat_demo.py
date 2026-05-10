@@ -175,7 +175,7 @@ def get_weather(city: str) -> str:
         desc_list = current.get("lang_pl", current.get("weatherDesc", [{"value": "brak danych"}]))
         obs_time = current.get("localObsDateTime", "")
         time_info = f", dane z {obs_time}" if obs_time else ""
-        return f"{city}: {current['temp_C']}°C, {desc_list[0]['value']}, wilgotność {current['humidity']}%{time_info} (źródło: wttr.in)"
+        return f"{city}: {current['temp_C']}°C, {desc_list[0]['value']}, wilgotność {current['humidity']}%{time_info} (wttr.in)"
     except Exception:
         pass
     if city in MOCK_WEATHER:
