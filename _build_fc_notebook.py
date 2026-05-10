@@ -479,14 +479,20 @@ if instructor_client:
         messages=[{"role": "user", "content": "Opowiedz o Wrocławiu"}],
     )
     print(f"Typ wyniku: {type(city).__name__}")
-    print(f"\\nPola:")
-    print(f"  city.name              = {city.name}")
-    print(f"  city.country           = {city.country}")
-    print(f"  city.population_approx = {city.population_approx}")
-    print(f"  city.famous_for        = {city.famous_for}")
+    print(f"Surowy obiekt: {city}")
     print(f"\\nJSON:\\n{city.model_dump_json(indent=2)}")
 else:
     print("instructor_client niedostępny — uruchom LLM-a i wróć do sekcji 2.")\
+"""))
+
+cells.append(code("""\
+# ↓ To NIE jest tekst — to obiekt Pythona! Mamy dostęp do pól: ↓
+if instructor_client:
+    print(f"city.name              → {city.name}")
+    print(f"city.country           → {city.country}")
+    print(f"city.population_approx → {city.population_approx}")
+    print(f"city.famous_for        → {city.famous_for}")
+    print(f"\\nPopulacja to int — można liczyć: {city.population_approx * 2} = podwójna populacja")\
 """))
 
 cells.append(md("""\
@@ -514,8 +520,6 @@ test_questions = [
     "Ile nóg ma pająk?",
 ]
 
-results = []  # ← zbieramy obiekty do listy!
-
 if instructor_client:
     for q in test_questions:
         print(f"\\nPytanie: \\"{q}\\"")
@@ -524,33 +528,11 @@ if instructor_client:
             response_model=MaybeCityInfo,
             messages=[{"role": "user", "content": q}],
         )
-        results.append(result)
-        # ↓ To NIE jest tekst! To obiekt Pythona z polami ↓
-        print(f"  Typ:    {type(result).__name__}")
-        print(f"  Obiekt: {result}")
         if result.found:
-            print(f"  ─── Dostęp do pól (jak zwykły obiekt): ───")
-            print(f"  result.name       → {result.name}")
-            print(f"  result.country    → {result.country}")
-            print(f"  result.population → {result.population_approx:_}")
-            print(f"  result.famous_for → {result.famous_for}")
+            print(f"  ✓ {result.name} ({result.country}), {result.population_approx:_} mieszkańców")
+            print(f"    Znane z: {result.famous_for}")
         else:
-            print(f"  ─── LLM odpowiedział: to nie miasto ───")
-            print(f"  result.found         → {result.found}")
-            print(f"  result.error_message → {result.error_message}")
-
-    # ── Kluczowy moment: to są OBIEKTY, nie tekst! ──
-    print(f"\\n{'═'*60}")
-    print(f"Mamy {len(results)} obiektów w liście 'results':")
-    cities = [r for r in results if r.found]
-    print(f"  Znalezione miasta: {[c.name for c in cities]}")
-    if cities:
-        print(f"\\n  Bierzemy pierwsze miasto z listy:")
-        print(f"    results[0].name       → {cities[0].name}")
-        print(f"    results[0].famous_for → {cities[0].famous_for}")
-        print(f"\\n  Populacja jako int (nie tekst!) — można liczyć:")
-        total = sum(c.population_approx for c in cities)
-        print(f"    sum(c.population_approx for c in cities) = {total:_}")
+            print(f"  ✗ result.found=False → LLM: {result.error_message}")
 else:
     print("instructor_client niedostępny.")\
 """))
