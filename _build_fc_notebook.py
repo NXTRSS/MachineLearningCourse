@@ -1555,6 +1555,7 @@ AVAILABLE_TOOLS["search_web"] = search_web
 class SearchWebArgs(BaseModel):
     query: str = Field(..., description="Zapytanie do wyszukiwarki")
 
+tools_definition = [t for t in tools_definition if t["function"]["name"] != "search_web"]
 tools_definition.append(
     make_tool("search_web",
               "Przeszukuje internet przez DuckDuckGo. Użyj TYLKO gdy potrzebujesz aktualnych informacji, "
