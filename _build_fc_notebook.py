@@ -994,9 +994,30 @@ test_tools = copy.deepcopy(tools_definition)
 
 # --- TUTAJ ZMIEŃ description ---
 
-test_tools[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"
+test_tools[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"\
+"""))
 
-# --- Funkcja do testowania (nie zmieniaj) ---
+cells.append(h6_collapsed(
+    '###### <span style="color: #c17f24;">Podpowiedź</span> '
+    '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
+))
+cells.append(md("""\
+Wpisz np.: `test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"`"""))
+cells.append(h6_collapsed(
+    '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
+    '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
+))
+cells.append(code("""\
+# Ćwiczenie 1A — rozwiązanie
+import copy
+
+test_tools = copy.deepcopy(tools_definition)
+test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"\
+"""))
+
+# --- test_1a: jedna definicja poniżej stubu i rozwiązania ---
+cells.append(code("""\
+# --- Test ćwiczenia 1A (uruchom po uzupełnieniu komórki powyżej) ---
 def test_1a(pytanie):
     new_desc = test_tools[0]["function"]["description"]
     if new_desc is ...:
@@ -1027,28 +1048,6 @@ def test_1a(pytanie):
             print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")
 
 # ═══ TESTUJ TUTAJ — zmień pytanie i uruchom komórkę ponownie! ═══
-
-test_1a("Jaka jest pogoda we Wrocławiu?")\
-"""))
-
-cells.append(h6_collapsed(
-    '###### <span style="color: #c17f24;">Podpowiedź</span> '
-    '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
-))
-cells.append(md("""\
-Wpisz np.: `tools_definition[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"`"""))
-cells.append(h6_collapsed(
-    '###### <span style="color: #5a8a6a;">Rozwiązanie</span> '
-    '<span style="color: #999; font-weight: normal; font-size: 0.85em;">(kliknij aby rozwinąć)</span>'
-))
-cells.append(code("""\
-# Ćwiczenie 1A — rozwiązanie
-import copy
-
-test_tools = copy.deepcopy(tools_definition)
-test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"
-
-# test_1a() jest zdefiniowane w komórce ćwiczenia powyżej — wystarczy wywołać:
 test_1a("Jaka jest pogoda we Wrocławiu?")\
 """))
 cells.append(separator())
