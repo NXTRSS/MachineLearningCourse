@@ -1776,31 +1776,7 @@ cells.append(student_stub("""\
 
 class FactCheck(BaseModel):
 
-    pass  # ✏️ Tutaj wpisz 5 pól opisanych powyżej
-
-# --- TEST (nie zmieniaj) ---
-if not instructor_client:
-    print("instructor_client niedostępny — pomiń to ćwiczenie.")
-elif not hasattr(FactCheck, 'model_fields') or 'verdict' not in FactCheck.model_fields:
-    print("\\033[1;31m⬆️ Uzupełnij model FactCheck! Brakuje pola 'verdict'.\\033[0m")
-else:
-    twierdzenia = [
-        "Lech Wałęsa dostał Pokojową Nagrodę Nobla w 1983 roku",
-        "Aleksander Kwaśniewski posiadał popiersie Kleopatry",
-        "Kraków jest stolicą Polski",
-    ]
-    for t in twierdzenia:
-        try:
-            fc = verify_claim(t)
-            print(f"Twierdzenie: {t}")
-            print(f"  Werdykt:  {fc.verdict} (pewność: {fc.confidence:.0%})")
-            print(f"  Dowody:   {fc.evidence[:100]}")
-            print(f"  Źródło:   {fc.source}")
-        except Exception as e:
-            print(f"Twierdzenie: {t}")
-            print(f"  ⚠️ Błąd: {str(e)[:150]}")
-            print("  (Mniejsze modele mogą nie generować poprawnego JSON-a — spróbuj z większym)")
-        print()\
+    pass  # ✏️ Tutaj wpisz 5 pól opisanych powyżej\
 """))
 
 cells.append(h6_collapsed(
