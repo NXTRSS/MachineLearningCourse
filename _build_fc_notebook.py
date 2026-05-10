@@ -1014,11 +1014,8 @@ test_tools = copy.deepcopy(tools_definition)
 
 test_tools[0]["function"]["description"] = ...  # np. "Przeszukuje bazę prezydentów Polski"
 
-# --- Test ---
 if test_tools[0]["function"]["description"] is ...:
-    print("\\033[1;31m⬆️ Uzupełnij description powyżej!\\033[0m")
-else:
-    test_1a("Jaka jest pogoda we Wrocławiu?")\
+    print("\\033[1;31m⬆️ Uzupełnij description powyżej!\\033[0m")\
 """))
 
 cells.append(h6_collapsed(
