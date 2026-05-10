@@ -46,6 +46,9 @@ parser.add_argument("--backend", "-b", type=str, default=None,
                     help="Wymuszony backend: 'ollama' lub 'lmstudio' (domyślnie: auto-detect)")
 parser.add_argument("--api-key", "-k", type=str, default=None,
                     help="API key do serwera LLM (np. LM Studio z auth)")
+parser.add_argument("--reasoning", "-r", type=str, default="all",
+                    choices=["all", "first", "none"],
+                    help="Wyświetlanie toku myślenia: 'all' (każdy krok), 'first' (tylko pierwszy), 'none' (wyłączone)")
 args = parser.parse_args()
 
 # ── Połączenie z LLM ─────────────────────────────────────────────────
@@ -359,4 +362,5 @@ if __name__ == "__main__":
         tools_definition=tools_definition,
         available_tools=AVAILABLE_TOOLS,
         system_prompt=DEFAULT_SYSTEM_PROMPT,
+        reasoning=args.reasoning,
     )
