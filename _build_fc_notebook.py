@@ -1048,32 +1048,7 @@ import copy
 test_tools = copy.deepcopy(tools_definition)
 test_tools[0]["function"]["description"] = "Przeszukuje bazę danych o prezydentach Polski"
 
-def test_1a(pytanie):
-    print(f"Nowy opis get_weather: '{test_tools[0]['function']['description']}'")
-    print(f"Ale nazwa to nadal:   '{test_tools[0]['function']['name']}'")
-    print(f"Pytanie: '{pytanie}'")
-    print()
-    if client:
-        messages = [
-            {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
-            {"role": "user", "content": pytanie}
-        ]
-        try:
-            response = client.chat.completions.create(
-                model=MODEL_NAME, messages=messages, tools=test_tools, temperature=0.1
-            )
-            msg = response.choices[0].message
-            print_reasoning(msg)
-            if msg.tool_calls:
-                tc = msg.tool_calls[0]
-                print(f"  LLM wybrał: {tc.function.name}({tc.function.arguments})")
-            else:
-                print(f"  LLM odpowiedział bez narzędzia: {(clean_content(msg) or '')[:200]}")
-        except Exception as e:
-            print(f"\\033[1;33m⚠️ Model zwrócił błąd: {e}\\033[0m")
-            print("Spróbuj uruchomić komórkę ponownie — niektóre modele czasem się zawieszają.")
-
-# ═══ TESTUJ TUTAJ ═══
+# test_1a() jest zdefiniowane w komórce ćwiczenia powyżej — wystarczy wywołać:
 test_1a("Jaka jest pogoda we Wrocławiu?")\
 """))
 cells.append(separator())
