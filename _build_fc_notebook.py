@@ -522,11 +522,19 @@ if instructor_client:
             response_model=MaybeCityInfo,
             messages=[{"role": "user", "content": q}],
         )
+        # ↓ To NIE jest tekst! To obiekt Pythona z polami ↓
+        print(f"  Typ:    {type(result).__name__}")
+        print(f"  Obiekt: {result}")
         if result.found:
-            print(f"  ✓ Znaleziono: {result.name} ({result.country}), {result.population_approx:_} mieszkańców")
-            print(f"    Znane z: {result.famous_for}")
+            print(f"  ─── Dostęp do pól (jak zwykły obiekt): ───")
+            print(f"  result.name       → {result.name}")
+            print(f"  result.country    → {result.country}")
+            print(f"  result.population → {result.population_approx:_}")
+            print(f"  result.famous_for → {result.famous_for}")
         else:
-            print(f"  ✗ Brak ustrukturyzowanej odpowiedzi — LLM: {result.error_message}")
+            print(f"  ─── LLM odpowiedział: to nie miasto ───")
+            print(f"  result.found         → {result.found}")
+            print(f"  result.error_message → {result.error_message}")
 else:
     print("instructor_client niedostępny.")\
 """))
