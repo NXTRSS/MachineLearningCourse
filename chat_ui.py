@@ -41,7 +41,7 @@ def launch_chat(
         max_steps: Maks. liczba kroków agenta na jedną wiadomość (domyślnie 6)
         share: True = publiczny link (np. do pokazania na zajęciach przez ngrok)
     """
-    from utils import extract_reasoning
+    from utils import extract_reasoning, clean_content
 
     try:
         import gradio as gr
@@ -87,8 +87,9 @@ def launch_chat(
 
             msg = response.choices[0].message
 
-            # ── Natywny reasoning (Qwen3, DeepSeek-R1) ──
+            # ── Natywny reasoning (Qwen3, DeepSeek-R1, Gemma-4 channel) ──
             reasoning = extract_reasoning(msg)
+            msg_content = clean_content(msg)
             if reasoning:
                 history.append(
                     {
@@ -100,11 +101,11 @@ def launch_chat(
                 yield history
 
             # ── LLM mówi coś przed tool callem ──
-            if msg.content and msg.tool_calls:
+            if msg_content and msg.tool_calls:
                 history.append(
                     {
                         "role": "assistant",
-                        "content": msg.content[:500],
+                        "content": msg_content[:500],
                         "metadata": {"title": "💬 Komentarz modelu"},
                     }
                 )
@@ -112,7 +113,7 @@ def launch_chat(
 
             # ── Brak tool calls → finalna odpowiedź ──
             if not msg.tool_calls:
-                content = msg.content or "(brak odpowiedzi)"
+                content = msg_content or "(brak odpowiedzi)"
                 history.append({"role": "assistant", "content": content})
                 yield history
                 return
@@ -165,10 +166,10 @@ def launch_chat(
 
     # ── Przykładowe pytania ──
     examples = [
-        "Ile to jest 2137 * 42?",
         "Jaka jest pogoda we Wrocławiu?",
-        "Kim był Lech Wałęsa? Sprawdź w bazie prezydentów.",
-        "Porównaj pogodę w Warszawie i Krakowie.",
+        "Opowiedz mi jakiś mało znany fakt o polskim prezydencie.",
+        "Jaki jest aktualny kurs dolara do złotówki?",
+        "Znajdź informacje o Nikoli Tesli na Wikipedii.",
     ]
 
     # ── Budujemy UI (Gradio 6) ──
@@ -200,7 +201,7 @@ def launch_chat(
         with gr.Row():
             clear_btn = gr.ClearButton([chatbot, textbox], value="🗑️ Wyczyść chat")
 
-        gr.Examples(examples=examples, inputs=textbox)
+        gr.Examples(examples=examples, inputs=textbox, label="Przykładowe pytania")
 
         # ── Logika przycisków ──
         textbox.submit(respond, [textbox, chatbot], [chatbot]).then(

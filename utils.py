@@ -764,46 +764,61 @@ def ensure_package(pip_name, import_name=None):
 # ── Reasoning helpers (Function Calling) ─────────────────────────────
 # Modele LLM mogą zwracać tok myślenia (reasoning) w RÓŻNYCH atrybutach
 # w zależności od dostawcy/modelu:
-#   - reasoning_content (Qwen3, DeepSeek-R1)
-#   - reasoning (niektóre OpenAI-compatible)
-#   - thought / thinking (inne implementacje)
-#
-# Te helpery ujednolicają dostęp — wyciągają reasoning niezależnie od
-# tego, pod jakim atrybutem model go zwrócił.
+#   - reasoning_content (Qwen3, DeepSeek-R1) — osobny atrybut
+#   - reasoning (niektóre OpenAI-compatible)  — osobny atrybut
+#   - thought / thinking (inne implementacje) — osobny atrybut
+#   - <|channel>thought ... <channel|> (Gemma-4) — w msg.content!
+
+import re as _re
 
 _REASONING_FIELDS = ('reasoning_content', 'reasoning', 'thought', 'thinking')
+
+_CHANNEL_RE = _re.compile(
+    r"<\|channel>thought\s*(.*?)\s*<channel\|>",
+    _re.DOTALL,
+)
+
+
+def _strip_channel_tokens(text):
+    if not text:
+        return text, None
+    m = _CHANNEL_RE.search(text)
+    thinking = m.group(1).strip() if m else None
+    cleaned = _CHANNEL_RE.sub("", text).strip()
+    return cleaned, thinking
 
 
 def extract_reasoning(msg):
     """
-    Wyciąga natywny tok myślenia (reasoning) z odpowiedzi LLM-a.
+    Wyciąga natywny tok myślenia z odpowiedzi LLM-a.
 
-    Modele takie jak Qwen3, DeepSeek-R1 zwracają reasoning w różnych
-    atrybutach. Ta funkcja sprawdza wszystkie znane nazwy i zwraca
-    pierwszą niepustą wartość (lub None).
-
-    Args:
-        msg: Obiekt wiadomości z response.choices[0].message
-
-    Returns:
-        str lub None — tok myślenia modelu, jeśli dostępny
+    Obsługuje:
+      - Qwen3/DeepSeek-R1: atrybut reasoning_content
+      - Gemma-4: tokeny <|channel>thought ... <channel|> w msg.content
     """
-    return next(
+    attr_reasoning = next(
         (getattr(msg, f, None) for f in _REASONING_FIELDS if getattr(msg, f, None)),
         None
     )
+    if attr_reasoning:
+        return attr_reasoning
+    _, channel_thinking = _strip_channel_tokens(getattr(msg, 'content', None))
+    return channel_thinking
+
+
+def clean_content(msg):
+    """
+    Zwraca msg.content oczyszczony z artefaktów reasoning (Gemma-4 channel tokens).
+    """
+    text = getattr(msg, 'content', None)
+    cleaned, _ = _strip_channel_tokens(text)
+    return cleaned
 
 
 def print_reasoning(msg, max_chars=500):
     """
     Wyświetla natywny tok myślenia (reasoning) z odpowiedzi LLM-a.
-
-    Jeśli model zwrócił reasoning — wyświetla go z emoji 🧠.
-    Jeśli nie — nie wyświetla nic (nie rzuca błędu).
-
-    Args:
-        msg: Obiekt wiadomości z response.choices[0].message
-        max_chars: Maksymalna liczba znaków do wyświetlenia (domyślnie 500)
+    Obsługuje wszystkie formaty (atrybuty + Gemma-4 channel tokens).
     """
     reasoning = extract_reasoning(msg)
     if reasoning:
