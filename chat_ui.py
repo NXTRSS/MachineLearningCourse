@@ -78,12 +78,51 @@ def launch_chat(
 
         # ── Agent loop (multi-step tool calling z pamięcią) ──
         for step in range(max_steps):
-            response = client.chat.completions.create(
+            # Wywołaj API w osobnym wątku, żeby animacja "myślę" działała
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import time as _time
+
+            future_pool = ThreadPoolExecutor(max_workers=1)
+            future = future_pool.submit(
+                client.chat.completions.create,
                 model=model_name,
                 messages=messages,
                 tools=tools_definition,
                 temperature=0.1,
             )
+
+            # Animacja oczekiwania — aktualizujemy co 0.8s
+            # Po 8s bez odpowiedzi → prawdopodobnie stoi w kolejce
+            QUEUE_THRESHOLD = 8
+            dots = ["⏳", "⏳.", "⏳..", "⏳..."]
+            tick = 0
+            _t0 = _time.monotonic()
+            base_msg = "Myślę" if step == 0 else "Analizuję wyniki narzędzia"
+            while not future.done():
+                elapsed = _time.monotonic() - _t0
+                if elapsed > QUEUE_THRESHOLD:
+                    indicator = dots[tick % len(dots)]
+                    queue_pos = f" ({int(elapsed)}s)"
+                    status = f"🕐 *Czekam w kolejce...{queue_pos}*"
+                else:
+                    indicator = dots[tick % len(dots)]
+                    status = f"{indicator} *{base_msg}...*"
+                # Dodaj/zamień wskaźnik
+                if history and history[-1].get("content", "").startswith(("⏳", "🕐")):
+                    history[-1] = {"role": "assistant", "content": status}
+                else:
+                    history.append({"role": "assistant", "content": status})
+                yield history
+                _time.sleep(0.8)
+                tick += 1
+
+            response = future.result()
+            future_pool.shutdown(wait=False)
+
+            # Usuń wskaźnik "myślę" / "czekam w kolejce"
+            if history and history[-1].get("content", "").startswith(("⏳", "🕐")):
+                history.pop()
+                yield history
 
             msg = response.choices[0].message
 

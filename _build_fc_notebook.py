@@ -143,10 +143,13 @@ from utils import connect_llm, extract_reasoning, print_reasoning, clean_content
 
 # Jeśli nie masz lokalnego LLM-a, wpisz adres serwera prowadzącego (podany na zajęciach):
 LECTURER_SERVER = "http://ADRES_SERWERA:PORT"  # ← prowadzący poda na zajęciach
+API_KEY = None  # ← wpisz klucz API jeśli serwer wymaga autentykacji (prowadzący poda)
 
 client, instructor_client, MODEL_NAME = connect_llm(
     lecturer_server=LECTURER_SERVER,
+    api_key=API_KEY,
     # model="gemma-4-e4b",  # ← odkomentuj, by wybrać konkretny model (np. "qwen", "llama")
+    # backend="ollama",     # ← odkomentuj, by pominąć LM Studio i użyć tylko Ollamy
 )
 
 # connect_llm zwraca DWA klienty:
@@ -168,19 +171,21 @@ cells.append(code("""\
 #   1. Łatwo zmienić zachowanie WSZYSTKICH funkcji naraz
 #   2. Studenci widzą, że system prompt to konfiguracja, nie magia
 #   3. Unikamy copy-paste tego samego tekstu w 7 miejscach
-#
-# <|think|> na początku → włącza natywny tok myślenia w Gemma-4.
-# Inne modele (Qwen3, Llama) go zignorują — nie przeszkadza.
 
-DEFAULT_SYSTEM_PROMPT = (
-    "<|think|>"
+_BASE_SYSTEM_PROMPT = (
     "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
     "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
     "nie próbuj odpowiadać z pamięci."
 )
 
+# <|think|> włącza natywny tok myślenia w Gemma-4 — inne modele go nie potrzebują
+_is_gemma = "gemma" in MODEL_NAME.lower()
+DEFAULT_SYSTEM_PROMPT = f"<|think|>{_BASE_SYSTEM_PROMPT}" if _is_gemma else _BASE_SYSTEM_PROMPT
+
 print(f"System prompt ({len(DEFAULT_SYSTEM_PROMPT)} znaków):")
-print(f"  {DEFAULT_SYSTEM_PROMPT[:80]}...")\
+print(f"  {DEFAULT_SYSTEM_PROMPT[:80]}...")
+if _is_gemma:
+    print("💡 Gemma wykryta → dodano <|think|> (natywne myślenie)")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════

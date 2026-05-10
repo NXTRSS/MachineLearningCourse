@@ -4,9 +4,11 @@ Chat z narzędziami — standalone demo.
 
 Uruchomienie:
     python chat_demo.py                              # auto-detect LLM
-    python chat_demo.py --model gemma                 # konkretny model (partial match)
+    python chat_demo.py --backend ollama              # wymuś Ollamę (pomiń LM Studio)
+    python chat_demo.py --backend ollama -m e4b       # Ollama + konkretny model
     python chat_demo.py --port 4242                   # konkretny port LM Studio
-    python chat_demo.py --port 4242 --model gemma     # oba
+    python chat_demo.py --port 4242 --api-key alk-2026  # LM Studio z kluczem API
+    python chat_demo.py --model gemma                 # partial match na nazwie modelu
 
 Otwiera w przeglądarce interfejs ChatGPT-like z:
   - kalkulatorem, pogodą, bazą prezydentów, Wikipedią, wyszukiwarką DuckDuckGo
@@ -39,6 +41,11 @@ parser.add_argument("--model", "-m", type=str, default=None,
                     help="Nazwa modelu (partial match, np. 'gemma')")
 parser.add_argument("--port", "-p", type=int, default=None,
                     help="Port LM Studio (np. 4242)")
+parser.add_argument("--backend", "-b", type=str, default=None,
+                    choices=["ollama", "lmstudio"],
+                    help="Wymuszony backend: 'ollama' lub 'lmstudio' (domyślnie: auto-detect)")
+parser.add_argument("--api-key", "-k", type=str, default=None,
+                    help="API key do serwera LLM (np. LM Studio z auth)")
 args = parser.parse_args()
 
 # ── Połączenie z LLM ─────────────────────────────────────────────────
@@ -47,7 +54,8 @@ if args.port:
     # Bezpośrednie połączenie na podany port
     from openai import OpenAI
     import instructor
-    client = OpenAI(base_url=f"http://localhost:{args.port}/v1", api_key="lm-studio")
+    key = args.api_key or "lm-studio"
+    client = OpenAI(base_url=f"http://localhost:{args.port}/v1", api_key=key)
     instructor_client = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
     # Pobierz nazwę modelu z serwera
     try:
@@ -58,7 +66,11 @@ if args.port:
         raise SystemExit(1)
 else:
     LECTURER_SERVER = "http://ADRES_SERWERA:PORT"
-    client, instructor_client, MODEL_NAME = connect_llm(lecturer_server=LECTURER_SERVER)
+    client, instructor_client, MODEL_NAME = connect_llm(
+        lecturer_server=LECTURER_SERVER,
+        api_key=args.api_key,
+        backend=args.backend,
+    )
 
 if not client:
     print("❌ Nie znaleziono LLM-a. Uruchom LM Studio lub Ollamę.")
@@ -82,11 +94,17 @@ print(f"✅ Model: {MODEL_NAME}")
 
 # ── System prompt ─────────────────────────────────────────────────────
 
-DEFAULT_SYSTEM_PROMPT = (
+_BASE_SYSTEM_PROMPT = (
     "Jesteś pomocnym asystentem. Odpowiadaj po polsku. "
     "ZAWSZE używaj dostępnych narzędzi gdy pytanie tego dotyczy — "
     "nie próbuj odpowiadać z pamięci."
 )
+
+# <|think|> włącza natywne myślenie Gemma-4 — inne modele go nie potrzebują
+_is_gemma = "gemma" in MODEL_NAME.lower()
+DEFAULT_SYSTEM_PROMPT = f"<|think|>{_BASE_SYSTEM_PROMPT}" if _is_gemma else _BASE_SYSTEM_PROMPT
+if _is_gemma:
+    print("💡 Gemma wykryta → dodaję <|think|> do system promptu")
 
 
 # ═══════════════════════════════════════════════════════════════════════
