@@ -706,7 +706,24 @@ print(get_weather("Wrocław"))\
 cells.append(md("""\
 ## 5. Baza prezydentów Polski
 
-Trzecie narzędzie — baza danych o prezydentach III RP wczytywana z pliku `prezydenci_polski.md`."""))
+Trzecie narzędzie — baza danych o prezydentach III RP wczytywana z pliku `prezydenci_polski.md`.
+
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:14px; border-radius:4px; margin:12px 0;">
+
+**🎯 Szansa i zagrożenie w jednym narzędziu**
+
+W naszej bazie `prezydenci_polski.md` celowo ukryliśmy **nieprawdziwe "mało znane fakty"**
+(np. fikcyjne popiersie Kleopatry u Kwaśniewskiego).
+
+To jednocześnie:
+- **Szansa** — możemy sprawdzić, czy LLM faktycznie korzysta z naszego narzędzia
+  (jeśli zwróci fikcyjny fakt → dowód, że sięgnął do naszej bazy, nie do internetu)
+- **Zagrożenie** — LLM przekaże fałszywą informację z pełnym przekonaniem,
+  bo nie ma jak zweryfikować rzetelności źródła
+
+To kluczowa lekcja: **agent jest tak dobry (lub tak zły) jak jego narzędzia i dane.**
+
+</div>"""))
 
 cells.append(code("""\
 def load_presidents():
@@ -1212,53 +1229,6 @@ W produkcyjnych systemach to prowadzi do:
 
 </div>"""))
 
-# ── FAŁSZYWE DANE W ŹRÓDLE ──
-
-cells.append(md("""\
-### Fałszywe dane w źródle — *"garbage in, garbage out"*
-
-Cichy błąd może wynikać nie tylko z podmienionego opisu narzędzia.
-Nawet gdy LLM wybierze **właściwą** funkcję — wynik jest tak dobry jak **dane źródłowe**.
-
-W naszym pliku `prezydenci_polski.md` ukryliśmy dwa **całkowicie zmyślone** "mało znane fakty".
-Sprawdźmy, czy LLM zwróci je z pełnym przekonaniem:"""))
-
-cells.append(code("""\
-# Zapytajmy o "mało znane fakty" — co zwróci nasz system?
-
-for q in ["mało znany fakt", "kolekcjoner monet"]:
-    print(f"Zapytanie: '{q}'")
-    print(f"{search_presidents(q)}")
-    print()\
-"""))
-
-cells.append(md("""\
-<div style="background:#f8d7da; border-left:4px solid #dc3545; padding:14px; border-radius:4px;">
-
-**Oba te "fakty" są całkowicie ZMYŚLONE!**
-
-- Kwaśniewski **nie miał** żadnego popiersia Kleopatry od ambasadora Egiptu
-- Duda **nie kolekcjonuje** antycznych monet z czasów Juliusza Cezara
-
-A mimo to nasz system zwrócił je jako prawdziwe dane.
-LLM nie ma jak sprawdzić czy źródło jest rzetelne — przekaże dalej wszystko co dostanie.
-
-</div>
-
-<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px; margin-top:10px;">
-
-**Wnioski z Ćwiczenia 1:**
-
-| Źródło błędu | Efekt | Wykrywalność |
-|---|---|---|
-| Zły opis narzędzia (ale znana nazwa) | LLM i tak trafia | Żaden — nam się udało! |
-| Podmienione nazwy + opisy | **Cichy błąd** — złe narzędzie, dane nie na temat | Trudna — trzeba sprawdzić |
-| Fałszywe dane w źródle | **Cichy błąd** — prawidłowe narzędzie, ale kłamstwo w danych | Bardzo trudna! |
-
-Dlatego w produkcyjnych systemach AI kluczowe są:
-**dobre opisy narzędzi** + **weryfikacja danych źródłowych** + **testy jakości odpowiedzi**
-
-</div>"""))
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1865,44 +1835,6 @@ if client:
     print("═"*60)
     agent("Co to jest fotosynteza i jaka jest pogoda w Krakowie?")\
 """))
-
-# ══════════════════════════════════════════════════════════════════════
-# TAJEMNICA PREZYDENCKA — DEMO
-# ══════════════════════════════════════════════════════════════════════
-
-cells.append(md("""\
-### Tajemnica prezydencka — skąd LLM to wie?
-
-Sprawdźmy jak agent radzi sobie z pytaniami o **mało znane fakty** z naszej bazy.
-Czy LLM użyje naszego lokalnego narzędzia, czy spróbuje szukać na Wikipedii?"""))
-
-cells.append(code("""\
-if client:
-    print("Test: Mało znane fakty o prezydentach")
-    print("═"*60)
-    agent("Jakie mało znane fakty kryją polscy prezydenci? Sprawdź w bazie prezydentów, szukaj 'mało znany fakt'.")
-
-    print("\\n\\nTest: Tajemnica gabinetu Kwaśniewskiego")
-    print("═"*60)
-    agent("Co ciekawego trzymał Aleksander Kwaśniewski w swoim gabinecie prezydenckim? Sprawdź w bazie prezydentów.")\
-"""))
-
-cells.append(md("""\
-<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:16px; border-radius:4px; margin:12px 0;">
-
-**Uwaga dla studentów:** Fakty o "popiersiu Kleopatry" (Kwaśniewski) i "monetach Cezara" (Duda) są
-**całkowicie fikcyjne** — dodaliśmy je do pliku `prezydenci_polski.md` specjalnie na potrzeby tego ćwiczenia.
-
-Ten eksperyment pokazuje coś ważnego:
-- LLM odpowiedział na pytanie o "tajemnicę" bo **nasze narzędzie** mu ją podało
-- Tych informacji **nie ma** na Wikipedii ani w internecie — i nie da się ich zweryfikować
-- LLM nie "wie" — on korzysta z **narzędzi** które mu dajemy
-
-**To jest klucz do zrozumienia agentów AI: agent jest tak dobry (lub tak zły) jak jego narzędzia.**
-
-Gdybyśmy podali LLM-owi fałszywe dane — odpowiedziałby fałszywie, z pełną pewnością.
-Dlatego **jakość danych** i **wybór narzędzi** to najważniejsze decyzje przy budowaniu agentów.
-</div>"""))
 
 # ══════════════════════════════════════════════════════════════════════
 # ĆWICZENIE 5
