@@ -1271,8 +1271,12 @@ cells.append(student_stub("""\
 # Krok 1: Zdefiniuj funkcję
 
 def get_population(city: str) -> str:
+    # Słownik z danymi: {"Warszawa": (1_860_000, 1), "Kraków": (800_000, 2), ...}
+    # Jeśli miasto jest w słowniku → zwróć f-string, np.:
+    #   "Kraków: ~800,000 mieszkańców (#2 w Polsce)"
+    # Jeśli nie ma → zwróć: f"Brak danych o populacji dla: {city}"
 
-    pass  # Tutaj wpisz swój kod — zwróć f-string z informacjami o mieście
+    pass  # ← zastąp swoim kodem
 
 # Krok 2: Dodaj do AVAILABLE_TOOLS (nie zmieniaj)
 AVAILABLE_TOOLS["get_population"] = get_population
