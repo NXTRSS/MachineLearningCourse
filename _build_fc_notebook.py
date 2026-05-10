@@ -1971,9 +1971,9 @@ if client:
     print("═"*60)
     agent("Jaka jest temperatura we Wrocławiu? Przelicz ją na stopnie Fahrenheita.")
 
-    print("\\n\\nTest 3: Prezydenci + populacja")
+    print("\\n\\nTest 3: Prezydenci + pogoda")
     print("═"*60)
-    agent("W jakim mieście urodził się Andrzej Duda? Ilu ludzi tam mieszka?")\
+    agent("W jakim mieście urodził się Andrzej Duda? Jaka jest tam teraz pogoda?")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════
