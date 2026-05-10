@@ -23,6 +23,7 @@ import argparse
 import json
 import math
 import urllib.parse
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -180,7 +181,8 @@ def get_weather(city: str) -> str:
         pass
     if city in MOCK_WEATHER:
         m = MOCK_WEATHER[city]
-        return f"{city}: {m['temp']}°C, {m['opis']}, wilgotność {m['wilgotność']}% (dane zastępcze)"
+        fake_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+        return f"{city}: {m['temp']}°C, {m['opis']}, wilgotność {m['wilgotność']}%, dane z {fake_time} (dane zastępcze)"
     return f"Brak danych pogodowych dla: {city}"
 
 
