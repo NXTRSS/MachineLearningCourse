@@ -3,11 +3,11 @@
 LLM Proxy — transparentny proxy między studentami a LM Studio.
 
 Uruchomienie:
-    python llm_proxy.py                                     # proxy :5000 → LM Studio :4242
-    python llm_proxy.py --proxy-port 6000 --lm-port 1234    # inne porty
+    python llm_proxy.py                                     # proxy :4242 → LM Studio :4141
+    python llm_proxy.py --proxy-port 5000 --lm-port 1234    # inne porty
     python llm_proxy.py --api-key sk-lm-xxx                 # z auth do LM Studio
 
-Studenci łączą się na port proxy (5000) — reszta bez zmian.
+Studenci łączą się na port proxy (4242) — reszta bez zmian.
 Prowadzący widzi:
   - Terminal: live dashboard (kto czeka, kto jest obsługiwany, czasy)
   - Przeglądarka: http://localhost:5050 — web dashboard z wykresami
@@ -30,10 +30,10 @@ import requests
 # ── CLI ──────────────────────────────────────────────────────────────
 
 parser = argparse.ArgumentParser(description="LLM Proxy z monitoringiem")
-parser.add_argument("--proxy-port", type=int, default=5000,
-                    help="Port na którym studenci się łączą (domyślnie 5000)")
-parser.add_argument("--lm-port", type=int, default=4242,
-                    help="Port LM Studio (domyślnie 4242)")
+parser.add_argument("--proxy-port", type=int, default=4242,
+                    help="Port na którym studenci się łączą (domyślnie 4242)")
+parser.add_argument("--lm-port", type=int, default=4141,
+                    help="Port LM Studio (domyślnie 4141)")
 parser.add_argument("--lm-host", type=str, default="localhost",
                     help="Host LM Studio (domyślnie localhost)")
 parser.add_argument("--dashboard-port", type=int, default=5050,
