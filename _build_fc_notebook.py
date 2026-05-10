@@ -166,6 +166,21 @@ if client:
 """))
 
 cells.append(code("""\
+# Nadpisanie modelu na czas testów (zakomentuj przed mergem na main):
+# connect_llm wybiera DOMYŚLNIE najmocniejszy dostępny model.
+# Argument `model=` to partial match — np. "gemma" wybierze pierwszy znaleziony
+# model z "gemma" w nazwie (przydatne do szybkich odpowiedzi / testów).
+
+client, instructor_client, MODEL_NAME = connect_llm(
+    lecturer_server=LECTURER_SERVER,
+    api_key=API_KEY,
+    # model="gemma",  # ← zmień na np. "qwen" / "llama" lub usuń, by zostawić auto
+    # backend="ollama",  # ← odkomentuj, by pominąć LM Studio
+)
+print(f"Nadpisano! Używam: {MODEL_NAME}")\
+"""))
+
+cells.append(code("""\
 # ── System prompt — wspólny dla wszystkich funkcji ──────────────────
 # Definiujemy go raz, w jednym miejscu. Dzięki temu:
 #   1. Łatwo zmienić zachowanie WSZYSTKICH funkcji naraz
@@ -706,24 +721,7 @@ print(get_weather("Wrocław"))\
 cells.append(md("""\
 ## 5. Baza prezydentów Polski
 
-Trzecie narzędzie — baza danych o prezydentach III RP wczytywana z pliku `prezydenci_polski.md`.
-
-<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:14px; border-radius:4px; margin:12px 0;">
-
-**🎯 Szansa i zagrożenie w jednym narzędziu**
-
-W naszej bazie `prezydenci_polski.md` celowo ukryliśmy **nieprawdziwe "mało znane fakty"**
-(np. fikcyjne popiersie Kleopatry u Kwaśniewskiego).
-
-To jednocześnie:
-- **Szansa** — możemy sprawdzić, czy LLM faktycznie korzysta z naszego narzędzia
-  (jeśli zwróci fikcyjny fakt → dowód, że sięgnął do naszej bazy, nie do internetu)
-- **Zagrożenie** — LLM przekaże fałszywą informację z pełnym przekonaniem,
-  bo nie ma jak zweryfikować rzetelności źródła
-
-To kluczowa lekcja: **agent jest tak dobry (lub tak zły) jak jego narzędzia i dane.**
-
-</div>"""))
+Trzecie narzędzie — baza danych o prezydentach III RP wczytywana z pliku `prezydenci_polski.md`."""))
 
 cells.append(code("""\
 def load_presidents():
@@ -1227,6 +1225,20 @@ W produkcyjnych systemach to prowadzi do:
 
 **Dlatego nazwy i opisy narzędzi to krytyczny element bezpieczeństwa AI systemów!**
 
+</div>
+
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:12px; border-radius:4px; margin-top:10px;">
+
+**Wnioski z Ćwiczenia 1:**
+
+| Źródło błędu | Efekt | Wykrywalność |
+|---|---|---|
+| Zły opis narzędzia (ale znana nazwa) | LLM i tak trafia | Żaden — nam się udało! |
+| Podmienione nazwy + opisy | **Cichy błąd** — złe narzędzie, dane nie na temat | Trudna — trzeba sprawdzić |
+
+Dlatego w produkcyjnych systemach AI kluczowe są:
+**dobre opisy narzędzi** + **testy jakości odpowiedzi**
+
 </div>"""))
 
 cells.append(separator())
@@ -1555,6 +1567,75 @@ if client:
 """))
 
 # ══════════════════════════════════════════════════════════════════════
+# SEKCJA 8b: TAJEMNICA W DANYCH — ZAGROŻENIE I SZANSA
+# ══════════════════════════════════════════════════════════════════════
+
+cells.append(md("""\
+## 8b. Tajemnica w danych — zagrożenie i szansa
+
+Zanim przejdziemy do weryfikacji faktów, muszę wam coś powiedzieć.
+W pliku `prezydenci_polski.md` **celowo ukryłem dwa zmyślone fakty** —
+"mało znane" informacje, które brzmią wiarygodnie, ale są **całkowicie fikcyjne**.
+
+Sprawdźmy, czy nasz agent je znajdzie i poda z pełnym przekonaniem:"""))
+
+cells.append(code("""\
+if client:
+    print("Test: Mało znane fakty o prezydentach")
+    print("═"*60)
+    ask_with_tools("Jakie mało znane fakty kryją polscy prezydenci? Sprawdź w bazie prezydentów, szukaj 'mało znany fakt'.")\
+"""))
+
+cells.append(md("""\
+<div style="background:#f8d7da; border-left:4px solid #dc3545; padding:14px; border-radius:4px;">
+
+**Oba te "fakty" są całkowicie ZMYŚLONE!**
+
+- Kwaśniewski **nie miał** żadnego popiersia Kleopatry od ambasadora Egiptu
+- Duda **nie kolekcjonuje** antycznych monet z czasów Juliusza Cezara
+
+A mimo to nasz agent zwrócił je z pełnym przekonaniem — bo **nasze narzędzie** mu je podało.
+Tych informacji **nie ma** na Wikipedii ani w internecie — nie da się ich zweryfikować z zewnątrz.
+
+</div>
+
+<div style="background:#fff3cd; border-left:4px solid #ffc107; padding:14px; border-radius:4px; margin-top:12px;">
+
+**Zagrożenie: *garbage in, garbage out***
+
+| Źródło błędu | Efekt | Wykrywalność |
+|---|---|---|
+| Zły opis narzędzia | LLM i tak trafia | Żaden — nam się udało! |
+| Podmienione nazwy + opisy | **Cichy błąd** — złe narzędzie | Trudna — trzeba sprawdzić |
+| Fałszywe dane w źródle | **Cichy błąd** — prawidłowe narzędzie, ale kłamstwo w danych | Bardzo trudna! |
+
+Agent jest tak dobry (lub tak zły) jak jego narzędzia i dane.
+
+</div>
+
+<div style="background:#d4edda; border-left:4px solid #28a745; padding:14px; border-radius:4px; margin-top:12px;">
+
+**Szansa: wewnętrzne repozytorium wiedzy**
+
+Ale odwróćmy perspektywę — ten sam mechanizm to ogromna **szansa**!
+
+Wyobraźcie sobie, że w waszej firmie jest:
+- 🔒 **Know-how** — innowacyjna procedura, której nie chcecie upubliczniać
+- 📋 **Regulacje wewnętrzne** — polityki, procedury, wytyczne dostępne tylko dla pracowników
+- 🧪 **Dane wrażliwe** — wyniki badań, analizy rynkowe, strategie
+
+Nie chcecie tego publikować w internecie — ale chcecie, żeby **LLM mógł podejmować decyzje na ich podstawie**.
+
+Rozwiązanie: **wewnętrzne, strzeżone repozytorium wiedzy** (baza danych, pliki, API),
+do którego LLM ma dostęp **wyłącznie przez function calling**. Dokładnie tak, jak nasz `search_presidents` —
+model nie "zna" tych danych z treningu, ale może je **odpytać** gdy potrzebuje.
+
+To jest fundament architektury **RAG** (Retrieval Augmented Generation), którą poznamy na następnych zajęciach,
+oraz **enterprise AI assistants** — wewnętrznych asystentów firmowych.
+
+</div>"""))
+
+# ══════════════════════════════════════════════════════════════════════
 # SEKCJA 9: INSTRUCTOR — STRUCTURED OUTPUT
 # ══════════════════════════════════════════════════════════════════════
 
@@ -1713,8 +1794,12 @@ class FactCheck(BaseModel):
         ..., description="Werdykt na podstawie dowodów"
     )
     confidence: float = Field(..., ge=0, le=1, description="Pewność werdyktu (0=zgaduję, 1=pewny)")
-    source: str = Field(..., description="Skąd pochodzą dowody, np. 'baza prezydentów', 'Wikipedia'")
+    source: str = Field(..., description="Skąd pochodzą dowody, np. 'baza prezydentów', 'Wikipedia'")\
+"""))
 
+cells.append(md("#####"))
+
+cells.append(code("""\
 # --- TEST ---
 if instructor_client:
     twierdzenia = [
@@ -1737,6 +1822,25 @@ if instructor_client:
 else:
     print("instructor_client niedostępny — pomiń to ćwiczenie.")\
 """))
+
+cells.append(md("""\
+<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:14px; border-radius:4px;">
+
+**Co się tu wydarzyło?**
+
+1. **Function Calling** pobrał dowody — z bazy prezydentów, Wikipedii lub weba (narzędzia `search_presidents`, `search_wikipedia`, `search_web`)
+2. **Instructor** (Structured Output) wziął te dowody i wyciągnął z nich ustrukturyzowany werdykt (`FactCheck`)
+3. Gdyby LLM pominął pole — instructor złapałby `ValidationError` i kazał spróbować ponownie
+
+To jest wzorzec **ETL z LLM-em**: Extract (narzędzia) → Transform (instructor) → Load (obiekt Pydantic).
+
+**Kiedy to stosować?**
+- Gdy źródło danych zwraca **nieustrukturyzowany tekst** (Wikipedia, web search, PDF, email...)
+- A Ty potrzebujesz **konkretnych pól** do dalszego przetwarzania
+- I chcesz **gwarancję formatu** (instructor z retry)
+
+</div>"""))
+
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1947,135 +2051,6 @@ Dla asystenta podróżniczego: `SYSTEM_PROMPT = "Jesteś asystentem podróżnicz
 cells.append(separator())
 
 # ══════════════════════════════════════════════════════════════════════
-# SEKCJA BONUS: FC + SO PIPELINE
-# ══════════════════════════════════════════════════════════════════════
-
-cells.append(md("""\
-## Bonus: FC + Structured Output w pipeline
-
-Zobaczmy jeszcze jeden wzorzec — **łączenie Function Calling ze Structured Output w jednym narzędziu**.
-
-Nasze narzędzia zwracają zwykły tekst — LLM sobie z nim radzi. Ale co jeśli narzędzie zwraca **surowy tekst**,
-z którego chcemy wyciągnąć strukturę?
-
-Np. Wikipedia zwraca akapit tekstu o Krakowie — a my chcemy obiekt `CityInfo(name=..., population=..., famous_for=...)`.
-
-**Nasz kod Pythona** tego nie potrafi (parsowanie języka naturalnego). Ale **LLM potrafi**!
-I tu `instructor` jest idealny — bo jeśli LLM nie wypełni wszystkich pól,
-instructor złapie `ValidationError` i każe mu spróbować ponownie (do 3 prób).
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  1. Function Calling     │  2. Structured Output            │
-│  (client + tools=)       │  (instructor + response_model=)  │
-│                          │                                   │
-│  LLM: "wywołaj           │  LLM: "wyciągnij z tego tekstu   │
-│   search_wikipedia(       │   pola: name, population,        │
-│   query='Kraków')"        │   famous_for"                    │
-│         ↓                │         ↓                         │
-│  Nasz kod → Wikipedia    │  instructor → obiekt Pydantic     │
-│         ↓                │  (z retry jeśli brakuje pól!)     │
-│  Surowy tekst            │                                   │
-└─────────────────────────────────────────────────────────────┘
-```"""))
-
-cells.append(code("""\
-# Model: ustrukturyzowane info o mieście
-class CityProfile(BaseModel):
-    name: str = Field(..., description="Nazwa miasta")
-    country: str = Field(..., description="Kraj")
-    population_approx: Optional[int] = Field(None, description="Przybliżona liczba mieszkańców (jeśli podana)")
-    famous_for: str = Field(..., description="Z czego miasto jest znane (1-2 zdania)")
-    fun_fact: Optional[str] = Field(None, description="Ciekawostka (jeśli znaleziona w tekście)")
-
-
-def smart_city_lookup(city_name: str) -> str:
-    \"\"\"
-    Pipeline: Wikipedia (surowy tekst) → LLM + instructor (strukturalny obiekt).
-
-    Krok 1: Function Calling — pobieramy artykuł z Wikipedii
-    Krok 2: Structured Output — LLM parsuje tekst → CityProfile
-    \"\"\"
-    # KROK 1: Pobierz surowy tekst z Wikipedii
-    try:
-        raw_text = search_wikipedia(city_name)
-    except Exception:
-        raw_text = f"Brak danych o mieście {city_name}"
-
-    print(f"  [Pipeline krok 1] Wikipedia zwróciła {len(raw_text)} znaków surowego tekstu")
-    print(f"  Fragment: \\"{raw_text[:120]}...\\"")
-
-    # KROK 2: LLM parsuje tekst → obiekt Pydantic (z retry!)
-    if not instructor_client:
-        return raw_text  # fallback: zwróć surowy tekst
-
-    try:
-        profile = instructor_client.chat.completions.create(
-            model=MODEL_NAME,
-            response_model=CityProfile,
-            messages=[
-                {"role": "system", "content":
-                 "Wyciągnij informacje o mieście z podanego tekstu. "
-                 "Użyj TYLKO informacji z tekstu — nie wymyślaj."},
-                {"role": "user", "content": f"Tekst źródłowy:\\n{raw_text}"}
-            ],
-        )
-        print(f"  [Pipeline krok 2] Instructor → CityProfile (z retry jeśli trzeba)")
-        return profile.model_dump_json(indent=2)
-    except Exception as e:
-        return f"Błąd parsowania: {e}\\n\\nSurowy tekst: {raw_text[:300]}"
-
-
-# Test pipeline
-if instructor_client:
-    print("=== Pipeline: Wikipedia → LLM → CityProfile ===\\n")
-    result = smart_city_lookup("Kraków")
-    print(f"\\n  Wynik (ustrukturyzowany):\\n{result}")
-else:
-    print("instructor_client niedostępny — uruchom LLM-a i wróć do sekcji 2.")\
-"""))
-
-cells.append(code("""\
-# Porównanie: surowy tekst z Wikipedii vs. ustrukturyzowany obiekt
-if instructor_client:
-    cities = ["Gdańsk", "Wrocław"]
-
-    for city_name in cities:
-        print(f"\\n{'═'*60}")
-        print(f"MIASTO: {city_name}")
-        print(f"{'═'*60}")
-        result_json = smart_city_lookup(city_name)
-
-        try:
-            parsed = json.loads(result_json)
-            print(f"\\n  Obiekt CityProfile:")
-            for key, val in parsed.items():
-                print(f"    {key}: {val}")
-        except Exception:
-            print(f"  (surowy wynik: {result_json[:200]})")
-else:
-    print("instructor_client niedostępny.")\
-"""))
-
-cells.append(md("""\
-<div style="background:#e8f4f8; border-left:4px solid #2196F3; padding:14px; border-radius:4px;">
-
-**Co się tu wydarzyło?**
-
-1. **Function Calling** pobrał surowy tekst z Wikipedii (narzędzie `search_wikipedia`)
-2. **Instructor** (Structured Output) wziął ten tekst i wyciągnął z niego ustrukturyzowane pola
-3. Gdyby LLM pominął pole — instructor złapałby `ValidationError` i kazał spróbować ponownie
-
-To jest wzorzec **ETL z LLM-em**: Extract (Wikipedia) → Transform (instructor) → Load (obiekt Pydantic).
-
-**Kiedy to stosować?**
-- Gdy źródło danych zwraca **nieustrukturyzowany tekst** (Wikipedia, web search, PDF, email...)
-- A Ty potrzebujesz **konkretnych pól** do dalszego przetwarzania
-- I chcesz **gwarancję formatu** (instructor z retry)
-
-</div>"""))
-
-# ══════════════════════════════════════════════════════════════════════
 # SEKCJA 11: PODSUMOWANIE
 # ══════════════════════════════════════════════════════════════════════
 
@@ -2211,6 +2186,75 @@ if client:
     print(f"\\n{'═'*60}")
     print(f"Historia konwersacji: {len(history)} wiadomości")\
 """))
+
+
+# ══════════════════════════════════════════════════════════════════════
+# SEKCJA 13: BONUS — CHAT UI
+# ══════════════════════════════════════════════════════════════════════
+
+cells.append(md("""\
+## 13. 🚀 Bonus: Chat UI — jak ChatGPT, ale Twój!
+
+Wszystkie funkcje które napisaliśmy (`ask_with_tools`, `agent`, `chat_with_tools`) działają w notebooku.
+Ale co gdyby nasz agent wyglądał **jak prawdziwy ChatGPT**?
+
+Jedna linijka kodu — i otwiera się przeglądarka z:
+- 💬 **dymkami wiadomości** (Ty po prawej, model po lewej)
+- 🧠 **collapsible reasoning** (tok myślenia modelu)
+- 🔧 **tool calls z wynikami** (widać co model wywołał)
+- 📝 **pamięcią konwersacji** (multi-turn jak ChatGPT)
+- 🔄 **agent loop** (model może wywołać wiele narzędzi po kolei)
+
+Pod spodem to dokładnie ten sam kod co pisaliśmy — tylko opakowany w [Gradio](https://gradio.app/)."""))
+
+cells.append(code("""\
+from utils import ensure_package
+ensure_package("gradio")
+
+from chat_ui import launch_chat
+
+# ── Chat UI ────────────────────────────────────────────────────────
+# Chat generuje DUŻO zapytań (każda wiadomość = nowe zapytanie do LLM).
+#
+# Masz lokalnego LLM-a? → Chat działa od razu, bez ograniczeń.
+# Korzystasz z serwera prowadzącego? → Wpisz hasło podane na zajęciach.
+
+CHAT_HASLO = ""  # ← prowadzący poda hasło na zajęciach (jeśli serwer udźwignie)
+
+_is_local = "localhost" in str(getattr(client, 'base_url', '')) or "127.0.0.1" in str(getattr(client, 'base_url', ''))
+
+if client and (_is_local or CHAT_HASLO == "chat"):
+    launch_chat(
+        client=client,
+        model_name=MODEL_NAME,
+        tools_definition=tools_definition,
+        available_tools=AVAILABLE_TOOLS,
+        system_prompt=DEFAULT_SYSTEM_PROMPT,
+    )
+elif client:
+    print("⚠️ Chat UI wyłączony — korzystasz z serwera prowadzącego.")
+    print("   Wpisz hasło podane przez prowadzącego w CHAT_HASLO powyżej.")
+    print("   Albo zainstaluj lokalnego LLM-a (LM Studio / Ollama) — wtedy chat działa bez hasła.")
+else:
+    print("LLM niedostępny.")\
+"""))
+
+cells.append(md("""\
+<div style="background:#e8f4f8; border-left:4px solid #17a2b8; padding:14px; border-radius:4px;">
+
+**Co się tu wydarzyło?**
+
+Cały nasz warsztat — od `calculate()` po `agent()` — zamknęliśmy w jednym pliku `chat_ui.py` (~150 linii).
+Biblioteka [Gradio](https://gradio.app/) daje nam profesjonalny interfejs webowy **za darmo**.
+
+To jest dokładnie tak jak buduje się narzędzia AI w firmach:
+1. **Backend** = Function Calling (to co pisaliśmy)
+2. **Frontend** = Gradio / Streamlit / React
+3. **Razem** = pełna aplikacja AI
+
+Twój lokalny LLM + nasze narzędzia = **Twój własny ChatGPT** 🎉
+
+</div>"""))
 
 
 # ══════════════════════════════════════════════════════════════════════
