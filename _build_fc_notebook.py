@@ -688,7 +688,9 @@ def get_weather(city: str) -> str:
         temp = current["temp_C"]
         cond = desc_list[0]["value"]
         hum = current["humidity"]
-        return f"{city}: {temp}°C, {cond}, wilgotność {hum}% (źródło: wttr.in)"
+        obs_time = current.get("localObsDateTime", "")
+        time_info = f", dane z {obs_time}" if obs_time else ""
+        return f"{city}: {temp}°C, {cond}, wilgotność {hum}%{time_info} (źródło: wttr.in)"
     except Exception:
         pass
 
