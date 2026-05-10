@@ -1290,6 +1290,9 @@ class GetPopulationArgs(BaseModel):
 
 _population_desc = ...  # Tutaj wpisz swój kod — opis narzędzia (1 zdanie, po polsku)
 
+# Usuwamy stary wpis (bezpieczne przy wielokrotnym uruchamianiu)
+tools_definition = [t for t in tools_definition if t["function"]["name"] != "get_population"]
+
 if _population_desc is ...:
     print("\\033[1;33m⬆️ Uzupełnij opis narzędzia powyżej!\\033[0m")
 else:
@@ -1341,6 +1344,8 @@ AVAILABLE_TOOLS["get_population"] = get_population
 class GetPopulationArgs(BaseModel):
     city: str = Field(..., description="Nazwa miasta, np. 'Kraków'")
 
+# Usuwamy stary wpis (np. z nieuzupełnionej komórki powyżej)
+tools_definition = [t for t in tools_definition if t["function"]["name"] != "get_population"]
 tools_definition.append(
     make_tool("get_population", "Zwraca przybliżoną liczbę mieszkańców polskiego miasta.", GetPopulationArgs)
 )
@@ -1421,6 +1426,9 @@ class SearchWikipediaArgs(BaseModel):
 
 _wikipedia_desc = ...  # ✏️ Tutaj wpisz opis narzędzia (string) — kiedy LLM powinien go użyć?
 
+# Usuwamy stary wpis (bezpieczne przy wielokrotnym uruchamianiu)
+tools_definition = [t for t in tools_definition if t["function"]["name"] != "search_wikipedia"]
+
 if _wikipedia_desc is ...:
     print("\\033[1;33m⬆️ Uzupełnij opis narzędzia powyżej!\\033[0m")
 else:
@@ -1482,6 +1490,7 @@ AVAILABLE_TOOLS["search_wikipedia"] = search_wikipedia
 class SearchWikipediaArgs(BaseModel):
     query: str = Field(..., description="Zapytanie do Wikipedii, np. 'fotosynteza', 'Nikola Tesla'")
 
+tools_definition = [t for t in tools_definition if t["function"]["name"] != "search_wikipedia"]
 tools_definition.append(
     make_tool("search_wikipedia",
               "Przeszukuje Wikipedię i zwraca streszczenie artykułu. "
