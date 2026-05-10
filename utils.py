@@ -580,10 +580,13 @@ def detect_ollama(base_url="http://localhost:11434"):
     return []
 
 
-def detect_lmstudio(base_url="http://localhost:1234"):
+def detect_lmstudio(base_url="http://localhost:1234", api_key=None):
     import requests
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     try:
-        r = requests.get(f"{base_url}/api/v1/models", timeout=3)
+        r = requests.get(f"{base_url}/api/v1/models", timeout=3, headers=headers)
         if r.status_code == 200:
             models = r.json().get("models", [])
             return [m["key"] for m in models if m.get("type") == "llm"]
@@ -621,10 +624,10 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
-def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None):
+def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key=None, backend=None):
     """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
-    Kolejność prób:
+    Kolejność prób (gdy backend=None):
       1. LM Studio lokalne (port 1234, potem port z lecturer_server)
       2. Auto-launch LM Studio (jeśli `lms` w PATH)
       3. Ollama lokalna (port 11434)
@@ -635,6 +638,10 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None):
         model: opcjonalny override — partial-match nazwy modelu (np. "gemma"
                wybierze pierwszy dostępny model z "gemma" w nazwie). Domyślnie
                None = automatyczny wybór najmocniejszego dostępnego.
+        api_key: opcjonalny klucz API do serwera LLM (np. LM Studio z włączonym
+                 Require Authentication). Domyślnie None = bez klucza.
+        backend: wymuszony backend — "ollama" lub "lmstudio". Pomija auto-detekcję
+                 i łączy się tylko z wybranym backendem. None = auto-detect (domyślne).
 
     Zwraca:
         client           — do function calling (tools=)
@@ -645,9 +652,10 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None):
     """
     from openai import OpenAI
 
-    def _make_clients(base_url, api_key, model):
+    def _make_clients(base_url, default_key, model):
         """Tworzy oba klienty: zwykły + instructor."""
-        client = OpenAI(base_url=f"{base_url}/v1", api_key=api_key)
+        key = api_key or default_key  # jawny api_key ma priorytet
+        client = OpenAI(base_url=f"{base_url}/v1", api_key=key)
         try:
             import instructor
             instr = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
@@ -664,6 +672,29 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None):
             print(f"  ⚠️ Nie znaleziono '{model}' — wybieram automatycznie")
         return pick_best_model(models) or models[0]
 
+    # ── Wymuszony backend ──────────────────────────────────────────────
+    if backend == "ollama":
+        print("Backend wymuszony: Ollama")
+        models = detect_ollama()
+        if models:
+            picked = _pick(models)
+            print(f"✓ Ollama! Model: {picked}")
+            return _make_clients("http://localhost:11434", "ollama", picked)
+        print("✗ Ollama nie działa (port 11434)!")
+        return None, None, None
+
+    if backend == "lmstudio":
+        print("Backend wymuszony: LM Studio")
+        models = detect_lmstudio("http://localhost:1234", api_key=api_key)
+        if models:
+            picked = _pick(models)
+            print(f"✓ LM Studio! Model: {picked}")
+            return _make_clients("http://localhost:1234", "lm-studio", picked)
+        print("✗ LM Studio nie działa (port 1234)!")
+        return None, None, None
+
+    # ── Auto-detect (backend=None) ────────────────────────────────────
+
     # 1) LM Studio lokalne — domyślny port + port z lecturer_server
     lms_ports = [1234]
     try:
@@ -677,9 +708,9 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None):
     for port in lms_ports:
         url = f"http://localhost:{port}"
         print(f"Szukam LM Studio (port {port})...")
-        models = detect_lmstudio(url)
+        models = detect_lmstudio(url, api_key=api_key)
         if not models and port == 1234:
-            models = _try_launch_lms() and detect_lmstudio(url)
+            models = _try_launch_lms() and detect_lmstudio(url, api_key=api_key)
         if models:
             picked = _pick(models)
             print(f"✓ LM Studio (port {port})! Model: {picked}")
@@ -699,7 +730,7 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None):
         print(f"  Lokalny LLM niedostępny.\nPróbuję serwer prowadzącego ({lecturer_server})...")
 
         # 3a) LM Studio na serwerze prowadzącego
-        models = detect_lmstudio(lecturer_server)
+        models = detect_lmstudio(lecturer_server, api_key=api_key)
         if models:
             picked = _pick(models)
             print(f"✓ Serwer prowadzącego (LM Studio)! Model: {picked}")
