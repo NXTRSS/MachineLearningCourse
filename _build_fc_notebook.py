@@ -773,21 +773,39 @@ PREZYDENCI = load_presidents()
 def search_presidents(query: str) -> str:
     \"\"\"
     Przeszukuje bazę danych o prezydentach Polski (III RP).
-    Zawiera informacje o kadencjach, partiach, wykształceniu,
-    kluczowych wydarzeniach i mało znanych faktach.
+
+    Każdy prezydent ma pola: Kadencja, Lata życia, Miejsce urodzenia,
+    Wiek w dniu objęcia urzędu, Partia, Wykształcenie, Poprzedni urząd,
+    Kluczowe wydarzenia, Mało znany fakt, Długość kadencji.
+
+    WAŻNE: Używaj KRÓTKICH zapytań — najlepiej samo nazwisko (np. 'Kwaśniewski')
+    lub jedno–dwa słowa kluczowe (np. 'wykształcenie', 'najmłodszy').
+    Nie pisz pełnych zdań — wyszukiwarka działa na dopasowanie słów.
 
     Args:
-        query: Zapytanie, np. 'najmłodszy prezydent', 'Kwaśniewski', 'mało znany fakt'
+        query: Krótkie zapytanie, np. 'Kwaśniewski', 'wykształcenie', 'mało znany fakt'
     \"\"\"
     if not PREZYDENCI:
         return "Brak danych — nie znaleziono pliku prezydenci_polski.md"
 
     query_lower = query.lower()
     words = query_lower.split()
-    wyniki = []
+
+    # Scoring — liczymy ile słów pasuje do każdego prezydenta
+    scored = []
     for p in PREZYDENCI:
         all_text = " ".join(f"{k} {v}" for k, v in p.items()).lower()
-        if all(w in all_text for w in words):
+        hits = sum(1 for w in words if w in all_text)
+        if hits > 0:
+            scored.append((hits / len(words), p))
+
+    # Sortujemy po trafności (malejąco)
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    # Zwracamy prezydentów z trafnością >= 50% (lub najlepszego jeśli nikt nie osiąga 50%)
+    wyniki = []
+    for score, p in scored:
+        if score >= 0.5 or (not wyniki and score > 0):
             lines = [f"### {p.get('imię', '?')}"]
             for key, val in p.items():
                 if key != 'imię':
@@ -841,9 +859,9 @@ tools_definition = [
               "Wykonuje obliczenie matematyczne. Użyj gdy trzeba coś policzyć.",
               CalculateArgs),
     make_tool("search_presidents",
-              "Przeszukuje bazę danych o prezydentach Polski (III RP) — rozumie pytania semantycznie. "
-              "Zawiera kadencje, partie, wykształcenie, kluczowe wydarzenia i mało znane fakty. "
-              "Użyj gdy pytanie dotyczy prezydentów RP.",
+              "Przeszukuje bazę prezydentów Polski (III RP). "
+              "Pola: kadencja, wiek w dniu objęcia urzędu, partia, wykształcenie, kluczowe wydarzenia, mało znane fakty. "
+              "Używaj KRÓTKICH zapytań — nazwisko lub słowo kluczowe (np. 'Kwaśniewski', 'wykształcenie').",
               SearchPresidentsArgs),
 ]
 
@@ -1576,8 +1594,8 @@ Sprawdźmy, czy LLM wybierze `search_web` zamiast `search_wikipedia` — pytamy 
 
 cells.append(code("""\
 if client:
-    # Pytanie o aktualne wydarzenia → LLM powinien wybrać search_web (nie Wikipedię)
-    ask_with_tools("Kto wygrał ostatni finał Ligi Mistrzów?")\
+    # Pytanie o aktualne ceny → LLM powinien wybrać search_web (nie Wikipedię)
+    ask_with_tools("Ile kosztuje bilet na pociąg Wrocław Warszawa?")\
 """))
 
 # ══════════════════════════════════════════════════════════════════════

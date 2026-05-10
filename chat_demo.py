@@ -227,10 +227,16 @@ def search_presidents(query: str) -> str:
         return "Brak danych — nie znaleziono pliku prezydenci_polski.md"
     query_lower = query.lower()
     words = query_lower.split()
-    wyniki = []
+    scored = []
     for p in PREZYDENCI:
         all_text = " ".join(f"{k} {v}" for k, v in p.items()).lower()
-        if all(w in all_text for w in words):
+        hits = sum(1 for w in words if w in all_text)
+        if hits > 0:
+            scored.append((hits / len(words), p))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    wyniki = []
+    for score, p in scored:
+        if score >= 0.5 or (not wyniki and score > 0):
             lines = [f"### {p.get('imię', '?')}"]
             for key, val in p.items():
                 if key != "imię":
@@ -247,7 +253,8 @@ tools_definition.append(
     make_tool(
         "search_presidents",
         "Przeszukuje bazę prezydentów Polski (III RP). "
-        "Zawiera kadencje, partie, wykształcenie, kluczowe wydarzenia i mało znane fakty.",
+        "Pola: kadencja, wiek w dniu objęcia urzędu, partia, wykształcenie, kluczowe wydarzenia, mało znane fakty. "
+        "Używaj KRÓTKICH zapytań — nazwisko lub słowo kluczowe.",
         SearchPresidentsArgs,
     )
 )
