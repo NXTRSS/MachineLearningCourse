@@ -1802,7 +1802,7 @@ class FactCheck(BaseModel):
     source: str = Field(..., description="Skąd pochodzą dowody, np. 'baza prezydentów', 'Wikipedia'")\
 """))
 
-cells.append(md("#####"))
+cells.append(md("##### "))
 
 cells.append(code("""\
 # --- TEST ---
