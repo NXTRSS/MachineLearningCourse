@@ -63,8 +63,8 @@ parser.add_argument("--verbose", "-v", action="store_true",
                     help="Live dashboard w terminalu (domyślnie: cichy tryb z logami)")
 parser.add_argument("--tunnel", "-t", action="store_true",
                     help="Uruchom Cloudflare Quick Tunnel (publiczny URL dla studentów na Colabie)")
-parser.add_argument("--local-only", action="store_true",
-                    help="Nasłuchuj tylko na 127.0.0.1 (domyślnie: 0.0.0.0 — LAN)")
+parser.add_argument("--lan", action="store_true",
+                    help="Nasłuchuj na 0.0.0.0 (LAN). Domyślnie: 127.0.0.1 (tylko localhost)")
 args = parser.parse_args()
 
 
@@ -249,7 +249,6 @@ class ProxyStats:
 
 
 stats = ProxyStats()
-_tunnel_url = None  # ustawiane w main() gdy --tunnel aktywny
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -483,8 +482,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <h1>🖥️ LLM Proxy Dashboard</h1>
 <p class="subtitle">PROXY_PORT → LM Studio :LM_PORT &nbsp;·&nbsp; <span id="clock"></span></p>
 <p style="background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px; margin:12px 0; font-size:1.05em;">
-  📋 LAN: &nbsp;<code style="color:#58a6ff; font-size:1.1em;">STUDENT_URL</code>
-  TUNNEL_LINE
+  📋 Adres dla studentów: &nbsp;<code style="color:#58a6ff; font-size:1.1em;">STUDENT_URL</code>
 </p>
 
 <div class="cards" id="cards"></div>
@@ -657,15 +655,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             html = DASHBOARD_HTML.replace("PROXY_PORT", str(args.proxy_port))
             html = html.replace("LM_PORT", str(args.lm_port))
-            if args.local_only:
-                html = html.replace("STUDENT_URL", "tylko localhost (--local-only)")
-            else:
+            if args.lan:
                 html = html.replace("STUDENT_URL", f"http://{_get_local_ip()}:{args.proxy_port}")
-            if _tunnel_url:
-                html = html.replace("TUNNEL_LINE",
-                    f'<br>🌐 Tunel: &nbsp;<code style="color:#3fb950; font-size:1.1em;">{_tunnel_url}</code>')
             else:
-                html = html.replace("TUNNEL_LINE", "")
+                html = html.replace("STUDENT_URL", "tylko localhost (--lan aby otworzyć)")
             body = html.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -702,14 +695,12 @@ def render_terminal():
     lines = []
     lines.append(f"{BOLD}╔═══════════════════════════════════════════════════════════════════╗{RESET}")
     lines.append(f"{BOLD}║  🖥️  LLM Proxy  :{args.proxy_port} → LM Studio :{args.lm_port}              {DIM}{now}{RESET}{BOLD}  ║{RESET}")
-    if args.local_only:
-        lines.append(f"{BOLD}║  🔒 Tylko localhost (--local-only)                               {BOLD}║{RESET}")
-    else:
+    if args.lan:
         _lip = _get_local_ip()
         _surl = f"http://{_lip}:{args.proxy_port}"
-        lines.append(f"{BOLD}║  📋 LAN:        {CYAN}{_surl}{RESET}{BOLD}                          ║{RESET}")
-    if _tunnel_url:
-        lines.append(f"{BOLD}║  🌐 Tunel:      {CYAN}{_tunnel_url}{RESET}{BOLD}  ║{RESET}")
+        lines.append(f"{BOLD}║  📋 Studenci:   {CYAN}{_surl}{RESET}{BOLD}                          ║{RESET}")
+    else:
+        lines.append(f"{BOLD}║  🔒 Tylko localhost (--lan aby otworzyć)                         {BOLD}║{RESET}")
     lines.append(f"{BOLD}║  📊 Dashboard:  http://localhost:{args.dashboard_port}                          {BOLD}║{RESET}")
     lines.append(f"{BOLD}╠═══════════════════════════════════════════════════════════════════╣{RESET}")
 
@@ -892,7 +883,7 @@ def main():
             return
 
     # Uruchom proxy
-    bind_host = "127.0.0.1" if args.local_only else "0.0.0.0"
+    bind_host = "0.0.0.0" if args.lan else "127.0.0.1"
     proxy_server = HTTPServer((bind_host, args.proxy_port), ProxyHandler)
     proxy_thread = threading.Thread(target=proxy_server.serve_forever, daemon=True)
     proxy_thread.start()
@@ -904,13 +895,13 @@ def main():
     dashboard_thread.start()
     print(f"   📊 Dashboard: http://localhost:{args.dashboard_port}")
 
-    if args.local_only:
-        print(f"\n   🔒 Tylko localhost (usuń --local-only aby otworzyć LAN)")
-    else:
+    if args.lan:
         _local_ip = _get_local_ip()
         _student_url = f"http://{_local_ip}:{args.proxy_port}"
         print(f"\n   📋 Adres dla studentów (LAN):")
         print(f"      LECTURER_SERVER = \"{_student_url}\"")
+    else:
+        print(f"\n   🔒 Tylko localhost (dodaj --lan aby otworzyć dla studentów w sieci)")
     if args.student_key:
         print(f"   🔑 Hasło dla studentów: ustawione ({'*' * len(args.student_key)})")
     else:
@@ -918,13 +909,13 @@ def main():
     print(f"   Ctrl+C aby zakończyć\n")
 
     # ── Tunnel (opcjonalny) ──
-    global _tunnel_url
     tunnel_proc = None
+    tunnel_url = None
     if args.tunnel:
-        tunnel_proc, _tunnel_url = _start_tunnel(args.proxy_port)
-        if _tunnel_url:
+        tunnel_proc, tunnel_url = _start_tunnel(args.proxy_port)
+        if tunnel_url:
             print(f"\n   🌐 URL dla Colab / zdalnych studentów:")
-            print(f"      LECTURER_SERVER = \"{_tunnel_url}\"")
+            print(f"      LECTURER_SERVER = \"{tunnel_url}\"")
             if args.student_key:
                 print(f"      Hasło: {'*' * len(args.student_key)}")
             print()
