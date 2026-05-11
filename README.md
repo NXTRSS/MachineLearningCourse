@@ -152,7 +152,7 @@ Jeśli zobaczysz `Environment verification: OK` — gotowe!
 
 ---
 
-## Ollama / LM Studio (warsztaty LLM)
+## LM Studio / Ollama (warsztaty LLM)
 
 Na zajęcia z Function Calling i RAG potrzebny jest lokalny model językowy.
 Uruchom notebook **`setup_local_llm.ipynb`** — sprawdzi sprzęt i przeprowadzi przez instalację.
