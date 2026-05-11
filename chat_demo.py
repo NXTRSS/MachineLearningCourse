@@ -58,21 +58,55 @@ if args.port:
     # Bezpośrednie połączenie na podany port
     from openai import OpenAI
     import instructor
+
+    base_url = f"http://localhost:{args.port}/v1"
     key = args.api_key or "lm-studio"
-    client = OpenAI(base_url=f"http://localhost:{args.port}/v1", api_key=key)
-    instructor_client = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
-    # Pobierz nazwę modelu z serwera
+    _needs_gui_auth = False
+
+    def _try_connect(api_key):
+        c = OpenAI(base_url=base_url, api_key=api_key)
+        models = [m.id for m in c.models.list().data]
+        return c, models
+
     try:
-        models = [m.id for m in client.models.list().data]
-        MODEL_NAME = models[0] if models else "unknown"
-    except Exception:
+        client, models = _try_connect(key)
+    except Exception as e:
         print(f"❌ Nie mogę połączyć się z localhost:{args.port}")
+        print(f"   Szczegóły: {e}")
         raise SystemExit(1)
+
+    # ── Sprawdź czy chat endpoint wymaga auth ──
+    #    Celowo BEZ nagłówka Authorization — testujemy czy serwer
+    #    odrzuci anonimowe zapytanie (401/403).
+    if not args.api_key:
+        import requests as _req
+        try:
+            probe = _req.post(
+                f"{base_url}/chat/completions",
+                json={"model": "test", "messages": []},
+                timeout=3,
+            )
+            if probe.status_code in (401, 403):
+                _needs_gui_auth = True
+                print("🔑 Serwer wymaga hasła — podasz je w przeglądarce.")
+        except Exception as e:
+            err = str(e).lower()
+            if "401" in err or "unauthorized" in err or "authentication" in err:
+                _needs_gui_auth = True
+                print("🔑 Serwer wymaga hasła — podasz je w przeglądarce.")
+
+    MODEL_NAME = models[0] if models else "unknown"
+    instructor_client = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
 else:
     LECTURER_SERVER = "http://ADRES_SERWERA:PORT"
+    # Jeśli nie podano --api-key, zapytaj interaktywnie (ukryte znaki)
+    api_key = args.api_key
+    if api_key is None:
+        import getpass
+        api_key = getpass.getpass("🔑 Hasło serwera (Enter = brak): ") or None
     client, instructor_client, MODEL_NAME = connect_llm(
         lecturer_server=LECTURER_SERVER,
-        api_key=args.api_key,
+        api_key=api_key,
         backend=args.backend,
     )
 
@@ -309,6 +343,7 @@ def search_web(query: str) -> str:
         parts = [f"Wyniki wyszukiwania: {query}\n"]
         for i, r in enumerate(results, 1):
             parts.append(f"{i}. {r['title']}\n   {r['body'][:200]}\n   {r['href']}")
+        parts.append("\n💡 To tylko snippety. Użyj fetch_webpage(url) aby przeczytać pełną treść wybranej strony.")
         return "\n\n".join(parts)
     except Exception as e:
         return f"Wyszukiwanie niedostępne (DuckDuckGo): {e}. Spróbuj Wikipedii."
@@ -321,9 +356,29 @@ AVAILABLE_TOOLS["search_web"] = search_web
 tools_definition.append(
     make_tool(
         "search_web",
-        "Przeszukuje internet przez DuckDuckGo. Użyj TYLKO gdy potrzebujesz aktualnych informacji, "
-        "których nie ma na Wikipedii ani w bazie prezydentów.",
+        "Przeszukuje internet przez DuckDuckGo. Zwraca tytuły i krótkie snippety. "
+        "Sprawdź czy snippety zawierają konkretną odpowiedź na pytanie użytkownika — "
+        "jeśli nie, użyj fetch_webpage na kilku URL-ach z wyników.",
         SearchWebArgs,
+    )
+)
+
+
+# ── 5b. Fetch webpage ───────────────────────────────────────────────
+
+from utils import fetch_webpage
+
+
+class FetchWebpageArgs(BaseModel):
+    url: str = Field(..., description="Pełny URL strony do pobrania, np. 'https://example.com/article'")
+
+AVAILABLE_TOOLS["fetch_webpage"] = fetch_webpage
+tools_definition.append(
+    make_tool(
+        "fetch_webpage",
+        "Pobiera stronę internetową i zwraca czysty tekst. "
+        "Użyj po search_web żeby przeczytać pełną treść strony z wyników wyszukiwania.",
+        FetchWebpageArgs,
     )
 )
 
@@ -367,6 +422,23 @@ if __name__ == "__main__":
 
     from chat_ui import launch_chat
 
+    # Jeśli proxy wymaga auth → hasło w GUI tworzy nowego klienta
+    _auth_callback = None
+    if _needs_gui_auth:
+        def _auth_callback(_username, password):
+            """Gradio auth: zwraca nowego klienta (sukces) lub False (błąd)."""
+            from openai import OpenAI
+            try:
+                new_client = OpenAI(base_url=base_url, api_key=password)
+                new_client.models.list()  # test połączenia
+                return new_client  # sukces → nowy klient
+            except Exception:
+                return False
+
+    # Proxy + auth → username + password; proxy bez auth → tylko username
+    _is_proxy = args.port is not None
+    _ask_user = _is_proxy and not _needs_gui_auth
+
     launch_chat(
         client=client,
         model_name=MODEL_NAME,
@@ -374,4 +446,6 @@ if __name__ == "__main__":
         available_tools=AVAILABLE_TOOLS,
         system_prompt=DEFAULT_SYSTEM_PROMPT,
         reasoning=args.reasoning,
+        auth_fn=_auth_callback,
+        ask_username=_ask_user,
     )

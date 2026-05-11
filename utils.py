@@ -555,15 +555,17 @@ def visualize_probabilities(probabilities, step, tokenizer, prompt, chosen_idx, 
 # ─────────────────────────── LLM auto-detect ────────────────────────────
 
 PREFERRED_MODELS = [
+    # Od najsilniejszego do najsłabszego; MoE przed dense w tej samej rodzinie
+    "qwen3.6:35b-a3b", "qwen3.6:27b",
     "qwen3.5:27b", "qwen3.5:9b", "qwen3.5:4b",
     "qwen3:14b", "qwen3:8b",
     "gemma4:12b", "gemma4:4b",
+    "gemma4:e4b", "gemma4:e2b",
     "gemma3:27b", "gemma3:12b", "gemma3:8b",
     "qwen2.5:14b", "qwen2.5:7b",
     "gemma2:9b", "mistral:7b", "llama3.1:8b",
     "qwen3.5:2b", "qwen3.5:0.8b",
     "qwen3:4b", "qwen3:1.7b", "qwen3:0.6b",
-    "gemma4:e4b", "gemma4:e2b",
     "gemma3:4b", "gemma3:1b", "qwen2.5:3b",
 ]
 
@@ -585,11 +587,21 @@ def detect_lmstudio(base_url="http://localhost:1234", api_key=None):
     headers = {}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    # Natywny endpoint LM Studio
     try:
         r = requests.get(f"{base_url}/api/v1/models", timeout=3, headers=headers)
         if r.status_code == 200:
             models = r.json().get("models", [])
             return [m["key"] for m in models if m.get("type") == "llm"]
+    except Exception:
+        pass
+    # Fallback: standardowy OpenAI endpoint (proxy, vLLM, itp.)
+    try:
+        r = requests.get(f"{base_url}/v1/models", timeout=3, headers=headers)
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            if data:
+                return [m["id"] for m in data]
     except Exception:
         pass
     return []
@@ -616,19 +628,30 @@ def _try_launch_lms():
 
 def pick_best_model(available_models, preferred=None):
     preferred = preferred or PREFERRED_MODELS
+    available_lower = [a.lower() for a in available_models]
+
+    # Przebieg 1: dokładny match z tagiem (Ollama ":" → LM Studio "-")
     for p in preferred:
-        pname = p.split(":")[0]
-        for a in available_models:
+        p_tag = p.replace(":", "-").lower()  # "qwen3.6:35b-a3b" → "qwen3.6-35b-a3b"
+        for i, a in enumerate(available_lower):
+            if p_tag in a or p.lower() == a:
+                return available_models[i]
+
+    # Przebieg 2: match po rodzinie (fallback gdy brak dokładnego)
+    for p in preferred:
+        pname = p.split(":")[0].lower()
+        for i, a in enumerate(available_lower):
             if pname in a:
-                return a
+                return available_models[i]
+
     return available_models[0] if available_models else None
 
 
-def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key=None, backend=None):
+def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key=None, backend=None, ports=None):
     """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
     Kolejność prób (gdy backend=None):
-      1. LM Studio lokalne (port 1234, potem port z lecturer_server)
+      1. LM Studio lokalne (port 1234 + dodatkowe z `ports`)
       2. Auto-launch LM Studio (jeśli `lms` w PATH)
       3. Ollama lokalna (port 11434)
       4. Serwer prowadzącego — próbuje LM Studio, potem Ollama
@@ -640,8 +663,14 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
                None = automatyczny wybór najmocniejszego dostępnego.
         api_key: opcjonalny klucz API do serwera LLM (np. LM Studio z włączonym
                  Require Authentication). Domyślnie None = bez klucza.
-        backend: wymuszony backend — "ollama" lub "lmstudio". Pomija auto-detekcję
-                 i łączy się tylko z wybranym backendem. None = auto-detect (domyślne).
+        backend: wymuszony backend (pomija auto-detekcję). Możliwe wartości:
+                 - "lmstudio" — tylko lokalne LM Studio
+                 - "ollama" — tylko lokalna Ollama
+                 - "lecturer" — tylko serwer prowadzącego (lecturer_server)
+                 - lista np. ["lmstudio", "ollama"] — próbuj w podanej kolejności
+                 - None — auto-detect: LM Studio → Ollama → serwer (domyślne)
+        ports: lista dodatkowych portów do szukania LM Studio na localhost
+               (np. [4141, 8080]). Domyślnie None = tylko port 1234.
 
     Zwraca:
         client           — do function calling (tools=)
@@ -672,80 +701,162 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
             print(f"  ⚠️ Nie znaleziono '{model}' — wybieram automatycznie")
         return pick_best_model(models) or models[0]
 
-    # ── Wymuszony backend ──────────────────────────────────────────────
-    if backend == "ollama":
-        print("Backend wymuszony: Ollama")
+    # ── Helpery do prób poszczególnych backendów ─────────────────────
+    lms_ports = [1234]
+    if ports:
+        for p in ports:
+            if p not in lms_ports:
+                lms_ports.append(p)
+
+    def _try_lmstudio():
+        for port in lms_ports:
+            url = f"http://localhost:{port}"
+            print(f"Szukam LM Studio (port {port})...")
+            models = detect_lmstudio(url, api_key=api_key)
+            if not models and port == 1234:
+                models = _try_launch_lms() and detect_lmstudio(url, api_key=api_key)
+            if models:
+                picked = _pick(models)
+                print(f"✓ LM Studio (port {port})! Model: {picked}")
+                return _make_clients(url, "lm-studio", picked)
+        return None
+
+    def _try_ollama():
+        print("Szukam lokalnej Ollamy (port 11434)...")
         models = detect_ollama()
         if models:
             picked = _pick(models)
-            print(f"✓ Ollama! Model: {picked}")
+            print(f"✓ Lokalna Ollama! Model: {picked}")
             return _make_clients("http://localhost:11434", "ollama", picked)
-        print("✗ Ollama nie działa (port 11434)!")
-        return None, None, None
+        return None
 
-    if backend == "lmstudio":
-        print("Backend wymuszony: LM Studio")
-        models = detect_lmstudio("http://localhost:1234", api_key=api_key)
-        if models:
-            picked = _pick(models)
-            print(f"✓ LM Studio! Model: {picked}")
-            return _make_clients("http://localhost:1234", "lm-studio", picked)
-        print("✗ LM Studio nie działa (port 1234)!")
-        return None, None, None
-
-    # ── Auto-detect (backend=None) ────────────────────────────────────
-
-    # 1) LM Studio lokalne — domyślny port + port z lecturer_server
-    lms_ports = [1234]
-    try:
-        from urllib.parse import urlparse
-        _port = urlparse(lecturer_server or "").port
-        if _port and _port != 1234:
-            lms_ports.append(_port)
-    except Exception:
-        pass
-
-    for port in lms_ports:
-        url = f"http://localhost:{port}"
-        print(f"Szukam LM Studio (port {port})...")
-        models = detect_lmstudio(url, api_key=api_key)
-        if not models and port == 1234:
-            models = _try_launch_lms() and detect_lmstudio(url, api_key=api_key)
-        if models:
-            picked = _pick(models)
-            print(f"✓ LM Studio (port {port})! Model: {picked}")
-            return _make_clients(url, "lm-studio", picked)
-
-    # 2) Ollama lokalna
-    print("  LM Studio niedostępne.\nSzukam lokalnej Ollamy (port 11434)...")
-    models = detect_ollama()
-    if models:
-        picked = _pick(models)
-        print(f"✓ Lokalna Ollama! Model: {picked}")
-        return _make_clients("http://localhost:11434", "ollama", picked)
-
-    # 3) Serwer prowadzącego — próbuj LM Studio, potem Ollama
-    _is_placeholder = not lecturer_server or "ADRES_SERWERA" in lecturer_server
-    if lecturer_server and not _is_placeholder:
-        print(f"  Lokalny LLM niedostępny.\nPróbuję serwer prowadzącego ({lecturer_server})...")
-
-        # 3a) LM Studio na serwerze prowadzącego
+    def _try_lecturer():
+        _is_placeholder = not lecturer_server or "ADRES_SERWERA" in lecturer_server
+        if not lecturer_server or _is_placeholder:
+            print("  Serwer prowadzącego: adres nie ustawiony.")
+            return None
+        print(f"Próbuję serwer prowadzącego ({lecturer_server})...")
         models = detect_lmstudio(lecturer_server, api_key=api_key)
         if models:
             picked = _pick(models)
-            print(f"✓ Serwer prowadzącego (LM Studio)! Model: {picked}")
+            print(f"✓ Serwer prowadzącego! Model: {picked}")
             return _make_clients(lecturer_server, "lm-studio", picked)
-
-        # 3b) Ollama na serwerze prowadzącego (inny port?)
-        #     Spróbuj ten sam adres ale z endpointem Ollamy
         models = detect_ollama(lecturer_server)
         if models:
             picked = _pick(models)
             print(f"✓ Serwer prowadzącego (Ollama)! Model: {picked}")
             return _make_clients(lecturer_server, "ollama", picked)
+        return None
+
+    _BACKENDS = {
+        "lmstudio": _try_lmstudio,
+        "ollama": _try_ollama,
+        "lecturer": _try_lecturer,
+    }
+
+    # ── Wymuszony backend (string lub lista) ──────────────────────────
+    if backend is not None:
+        backends = [backend] if isinstance(backend, str) else list(backend)
+        print(f"Backend: {', '.join(backends)}")
+        for b in backends:
+            fn = _BACKENDS.get(b)
+            if not fn:
+                print(f"  ⚠️ Nieznany backend: '{b}' (dostępne: {', '.join(_BACKENDS)})")
+                continue
+            result = fn()
+            if result:
+                return result
+            print(f"  ✗ {b} — nie znaleziono")
+        return None, None, None
+
+    # ── Auto-detect (backend=None): LM Studio → Ollama → serwer ──────
+    result = _try_lmstudio()
+    if result:
+        return result
+
+    print("  LM Studio niedostępne.")
+    result = _try_ollama()
+    if result:
+        return result
+
+    print("  Lokalny LLM niedostępny.")
+    result = _try_lecturer()
+    if result:
+        return result
 
     print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
     return None, None, None
+
+
+def setup_auth_client(client, instructor_client, model_name):
+    """Sprawdź czy serwer wymaga auth i poproś o dane studenta.
+
+    Logika:
+      - Jeśli client wskazuje na localhost/127.0.0.1 → lokalny LLM, nic nie rób.
+      - Jeśli serwer zdalny → sonda BEZ Authorization.
+        - 401/403 → pyta o imię + hasło, tworzy nowego klienta z auth.
+        - Brak 401 → serwer nie wymaga auth, nic nie rób.
+
+    Zwraca: (client, instructor_client) — oryginalne lub nowe.
+    """
+    if not client:
+        return client, instructor_client
+
+    base_url = str(getattr(client, "base_url", ""))
+    is_local = "localhost" in base_url or "127.0.0.1" in base_url
+    if is_local:
+        return client, instructor_client
+
+    # ── Sonda: czy serwer wymaga hasła? ──
+    import requests as _req
+    needs_password = False
+    try:
+        probe = _req.post(
+            f"{base_url.rstrip('/')}/chat/completions",
+            json={"model": "test", "messages": []},
+            timeout=3,
+        )
+        needs_password = probe.status_code in (401, 403)
+    except Exception:
+        pass
+
+    if not needs_password:
+        # Serwer nie wymaga auth — nic nie zmieniaj
+        return client, instructor_client
+
+    # ── Serwer wymaga auth → imię + hasło ──
+    import getpass as _gp
+    from openai import OpenAI
+
+    student_name = input("👤 Twoje imię: ").strip() or "Anonim"
+    student_key = _gp.getpass("🔑 Hasło (prowadzący poda na zajęciach): ")
+
+    new_client = OpenAI(
+        base_url=base_url,
+        api_key=student_key or "no-key",
+        default_headers={"X-Student-Name": student_name},
+    )
+
+    # Test połączenia
+    try:
+        new_client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": "test"}],
+            max_tokens=1,
+        )
+        print(f"✅ Połączono z serwerem jako {student_name}")
+    except Exception as e:
+        print(f"❌ Błąd połączenia: {e}")
+        print("   Sprawdź hasło i spróbuj ponownie.")
+        return None, None
+
+    try:
+        import instructor
+        new_instr = instructor.from_openai(new_client, mode=instructor.Mode.MD_JSON)
+    except Exception:
+        new_instr = None
+
+    return new_client, new_instr
 
 
 # ─────────────────────────── ensure_package ───────────────────────────
@@ -857,3 +968,70 @@ def print_reasoning(msg, max_chars=500):
         for line in str(reasoning)[:max_chars].split("\n"):
             print(f"     {line}")
         print()
+
+
+# ─────────────────────────── Web tools ──────────────────────────────
+
+from html.parser import HTMLParser as _HTMLParser
+
+
+class _TextExtractor(_HTMLParser):
+    """Prosty ekstraktor tekstu z HTML — stdlib, zero zależności."""
+
+    _SKIP_TAGS = frozenset(('script', 'style', 'nav', 'noscript', 'svg'))
+    _BLOCK_TAGS = frozenset(('p', 'br', 'div', 'h1', 'h2', 'h3', 'h4',
+                             'h5', 'h6', 'li', 'tr', 'article', 'section'))
+
+    def __init__(self):
+        super().__init__()
+        self._parts: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self._SKIP_TAGS:
+            self._skip_depth += 1
+
+    def handle_endtag(self, tag):
+        if tag in self._SKIP_TAGS:
+            self._skip_depth = max(0, self._skip_depth - 1)
+        if tag in self._BLOCK_TAGS:
+            self._parts.append('\n')
+
+    def handle_data(self, data):
+        if self._skip_depth == 0:
+            self._parts.append(data)
+
+    def get_text(self):
+        text = ''.join(self._parts)
+        text = _re.sub(r'[ \t]+', ' ', text)
+        text = _re.sub(r'\n{3,}', '\n\n', text)
+        return text.strip()
+
+
+def fetch_webpage(url: str, max_chars: int = 3000) -> str:
+    """
+    Pobiera stronę internetową i zwraca jej treść jako czysty tekst (bez HTML).
+
+    Użyj po search_web, żeby przeczytać pełną treść strony z wyników wyszukiwania.
+
+    Args:
+        url: Pełny adres URL strony do pobrania, np. 'https://example.com/article'
+        max_chars: Maksymalna liczba znaków do zwrócenia (domyślnie 3000)
+    """
+    import requests
+    try:
+        r = requests.get(
+            url, timeout=10,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; StudentBot/1.0)"},
+        )
+        r.raise_for_status()
+        extractor = _TextExtractor()
+        extractor.feed(r.text)
+        text = extractor.get_text()
+        if not text:
+            return f"Strona {url} nie zawiera czytelnego tekstu."
+        if len(text) > max_chars:
+            text = text[:max_chars] + f"\n\n[...obcięto do {max_chars} znaków]"
+        return f"Treść strony {url}:\n\n{text}"
+    except Exception as e:
+        return f"Nie udało się pobrać {url}: {e}"
