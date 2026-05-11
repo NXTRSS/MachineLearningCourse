@@ -118,3 +118,42 @@ Pierwsze budowanie pobiera ~2 GB danych. Upewnij się, że masz stabilne połąc
 
 ### Nie działa? Przejdź do Planu C
 **➡️ [Plan C — Google Colab](PLAN_C_COLAB.md)**
+
+---
+
+## Używanie modeli językowych (LLM) w Dockerze
+
+Na zajęciach z Function Calling i RAG potrzebujesz dostępu do modelu językowego.
+Notebook automatycznie szuka LLM-a — nie musisz nic zmieniać w kodzie.
+
+### Opcja 1: Własny LLM na komputerze (zalecana jeśli masz ≥16 GB RAM)
+
+1. Zainstaluj **LM Studio** lub **Ollamę** na swoim komputerze (nie w Dockerze!) — szczegóły w [LOKALNE_LLM.md](LOKALNE_LLM.md)
+2. Uruchom model (np. `gemma4:e4b`)
+3. Uruchom Docker: `docker compose up`
+4. W notebooku uruchom komórkę z `connect_llm` — wykryje LLM automatycznie
+
+> **Jak to działa?** Kontener Docker automatycznie szuka LLM-a na Twoim komputerze
+> przez adres `host.docker.internal`. Nie musisz konfigurować sieci.
+
+### Opcja 2: Serwer prowadzącego (na zajęciach)
+
+1. Prowadzący poda adres serwera (np. `http://192.168.1.100:4242`)
+2. W notebooku zmień `LECTURER_SERVER`:
+   ```python
+   LECTURER_SERVER = "http://192.168.1.100:4242"  # ← adres od prowadzącego
+   ```
+3. Uruchom komórkę — `connect_llm` połączy się z serwerem
+
+### Najczęstsze problemy z LLM w Dockerze
+
+**"connect_llm nic nie znajduje"**
+
+Sprawdź czy LM Studio / Ollama działa na Twoim komputerze (nie w kontenerze):
+- LM Studio: otwórz aplikację → upewnij się, że model jest załadowany i serwer uruchomiony
+- Ollama: `ollama ps` powinno pokazać załadowany model
+
+**"Model działa bardzo wolno"**
+
+Nie uruchamiaj LLM-a wewnątrz Dockera na Macu — Docker na macOS nie ma dostępu do GPU Apple Silicon.
+Zainstaluj LM Studio / Ollamę bezpośrednio na Macu, a Docker połączy się automatycznie.

@@ -83,3 +83,34 @@ Invoke-RestMethod -Uri "http://<adres-prowadzącego>:1234/v1/models"
 ```
 
 Jeśli serwer działa, dostaniesz odpowiedź JSON z nazwą modelu.
+
+
+## Dostęp zdalny (Google Colab / studenci poza siecią WiFi)
+
+Studenci na Colabie lub poza siecią lokalną mogą połączyć się przez tunel internetowy.
+Proxy obsługuje to jednym parametrem:
+
+### Uruchomienie z tunelem
+
+```bash
+python llm_proxy.py --tunnel -s alk-2026
+```
+
+Proxy wypisze:
+```
+🌐 URL dla Colab / zdalnych studentów:
+   LECTURER_SERVER = "https://abc-xyz.trycloudflare.com"
+```
+
+Podaj ten adres i hasło studentom na Colabie.
+
+### Wymagania
+
+- **cloudflared** — instalacja: `brew install cloudflared` (macOS) lub [cloudflare.com](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+- **Hasło (`-s`)** — wymagane przy tunelowaniu (zabezpieczenie przed nieautoryzowanym dostępem)
+
+### Ważne
+
+- Adres tunelu zmienia się przy każdym uruchomieniu — trzeba go podać na nowo
+- Istniejące zabezpieczenia (hasło + rate limiting) chronią przed nieautoryzowanym dostępem
+- Tunel działa przez HTTPS — certyfikat SSL jest automatyczny

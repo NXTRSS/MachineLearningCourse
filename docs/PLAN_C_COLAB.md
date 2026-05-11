@@ -68,6 +68,33 @@ Jeśli automatyczne pobieranie nie zadziała, dane można wgrać ręcznie przez 
 - **GPU** — Colab daje darmowy dostęp do GPU. Aby go włączyć: **Runtime** → **Change runtime type** → **T4 GPU**
 
 
+## Używanie modeli językowych (LLM) w Colabie
+
+Na zajęciach z Function Calling i RAG potrzebujesz dostępu do modelu językowego.
+W Colabie używamy **serwera prowadzącego** przez internet.
+
+### Konfiguracja
+
+Prowadzący poda na zajęciach:
+- **Adres serwera** (np. `https://abc-xyz.trycloudflare.com`)
+- **Hasło** (np. `alk-2026`)
+
+W notebooku zmień `LECTURER_SERVER`:
+```python
+LECTURER_SERVER = "https://abc-xyz.trycloudflare.com"  # ← adres od prowadzącego
+```
+
+Uruchom komórkę z `connect_llm` — poprosi o hasło, a potem połączy się z serwerem.
+
+> **Uwaga:** Adres serwera zmienia się na każdych zajęciach. Zawsze pytaj prowadzącego o aktualny.
+
+### Jeśli nie działa
+
+1. Sprawdź czy wpisałeś `https://` (nie `http://`)
+2. Sprawdź czy adres jest aktualny (prowadzący mógł restartować tunel)
+3. Sprawdź hasło — prowadzący poda je na zajęciach
+
+
 ## Alternatywa: MyBinder
 
 Można też otworzyć środowisko jednym kliknięciem przez MyBinder:
