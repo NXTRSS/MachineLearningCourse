@@ -63,6 +63,8 @@ parser.add_argument("--verbose", "-v", action="store_true",
                     help="Live dashboard w terminalu (domyślnie: cichy tryb z logami)")
 parser.add_argument("--tunnel", "-t", action="store_true",
                     help="Uruchom Cloudflare Quick Tunnel (publiczny URL dla studentów na Colabie)")
+parser.add_argument("--lan", action="store_true",
+                    help="Nasłuchuj na 0.0.0.0 (LAN). Domyślnie: 127.0.0.1 (tylko localhost)")
 args = parser.parse_args()
 
 
@@ -643,7 +645,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             html = DASHBOARD_HTML.replace("PROXY_PORT", str(args.proxy_port))
             html = html.replace("LM_PORT", str(args.lm_port))
-            html = html.replace("STUDENT_URL", f"http://{_get_local_ip()}:{args.proxy_port}")
+            if args.lan:
+                html = html.replace("STUDENT_URL", f"http://{_get_local_ip()}:{args.proxy_port}")
+            else:
+                html = html.replace("STUDENT_URL", "tylko localhost (--lan aby otworzyć)")
             body = html.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -678,11 +683,14 @@ def render_terminal():
     snap = stats.snapshot()
 
     lines = []
-    _lip = _get_local_ip()
-    _surl = f"http://{_lip}:{args.proxy_port}"
     lines.append(f"{BOLD}╔═══════════════════════════════════════════════════════════════════╗{RESET}")
     lines.append(f"{BOLD}║  🖥️  LLM Proxy  :{args.proxy_port} → LM Studio :{args.lm_port}              {DIM}{now}{RESET}{BOLD}  ║{RESET}")
-    lines.append(f"{BOLD}║  📋 Studenci:   {CYAN}{_surl}{RESET}{BOLD}                          ║{RESET}")
+    if args.lan:
+        _lip = _get_local_ip()
+        _surl = f"http://{_lip}:{args.proxy_port}"
+        lines.append(f"{BOLD}║  📋 Studenci:   {CYAN}{_surl}{RESET}{BOLD}                          ║{RESET}")
+    else:
+        lines.append(f"{BOLD}║  🔒 Tylko localhost (--lan aby otworzyć)                         {BOLD}║{RESET}")
     lines.append(f"{BOLD}║  📊 Dashboard:  http://localhost:{args.dashboard_port}                          {BOLD}║{RESET}")
     lines.append(f"{BOLD}╠═══════════════════════════════════════════════════════════════════╣{RESET}")
 
@@ -864,21 +872,25 @@ def main():
             return
 
     # Uruchom proxy
-    proxy_server = HTTPServer(("0.0.0.0", args.proxy_port), ProxyHandler)
+    bind_host = "0.0.0.0" if args.lan else "127.0.0.1"
+    proxy_server = HTTPServer((bind_host, args.proxy_port), ProxyHandler)
     proxy_thread = threading.Thread(target=proxy_server.serve_forever, daemon=True)
     proxy_thread.start()
-    print(f"   🔀 Proxy nasłuchuje na :{args.proxy_port}")
+    print(f"   🔀 Proxy nasłuchuje na {bind_host}:{args.proxy_port}")
 
-    # Uruchom dashboard
-    dashboard_server = HTTPServer(("0.0.0.0", args.dashboard_port), DashboardHandler)
+    # Uruchom dashboard (zawsze localhost — tylko dla prowadzącego)
+    dashboard_server = HTTPServer(("127.0.0.1", args.dashboard_port), DashboardHandler)
     dashboard_thread = threading.Thread(target=dashboard_server.serve_forever, daemon=True)
     dashboard_thread.start()
     print(f"   📊 Dashboard: http://localhost:{args.dashboard_port}")
 
-    _local_ip = _get_local_ip()
-    _student_url = f"http://{_local_ip}:{args.proxy_port}"
-    print(f"\n   📋 Adres dla studentów (do notebooka):")
-    print(f"      LECTURER_SERVER = \"{_student_url}\"")
+    if args.lan:
+        _local_ip = _get_local_ip()
+        _student_url = f"http://{_local_ip}:{args.proxy_port}"
+        print(f"\n   📋 Adres dla studentów (LAN):")
+        print(f"      LECTURER_SERVER = \"{_student_url}\"")
+    else:
+        print(f"\n   🔒 Tylko localhost (dodaj --lan aby otworzyć dla studentów w sieci)")
     if args.student_key:
         print(f"   🔑 Hasło dla studentów: ustawione ({'*' * len(args.student_key)})")
     else:
