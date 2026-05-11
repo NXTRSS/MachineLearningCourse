@@ -313,8 +313,17 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _get_client_ip(self):
+        """Prawdziwe IP klienta (przez tunel: z nagłówka Cf-Connecting-Ip)."""
+        if args.tunnel:
+            ip = (self.headers.get("Cf-Connecting-Ip")
+                  or self.headers.get("X-Forwarded-For", "").split(",")[0].strip())
+            if ip:
+                return ip
+        return self.client_address[0]
+
     def _forward(self, method):
-        client_ip = self.client_address[0]
+        client_ip = self._get_client_ip()
         path = self.path
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length) if content_length > 0 else None
@@ -521,6 +530,7 @@ let lastTotal = null;
 let currentPage = 0;
 
 function fmt(s) { return s < 1 ? Math.round(s*1000)+'ms' : s.toFixed(1)+'s'; }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 async function clearHistory() {
   if (!confirm('Wyczyścić historię zapytań?')) return;
@@ -572,10 +582,10 @@ async function refresh() {
         : '⏳ Aktywne zapytania (0)';
     const aBody = document.querySelector('#active-table tbody');
     aBody.innerHTML = d.active.map(r => `<tr>
-      <td>${r.username || r.ip}</td>
+      <td>${esc(r.username || r.ip)}</td>
       <td class="status-active">${fmt(r.duration)}...</td>
-      <td>${r.model}</td>
-      <td class="question">${r.question || '—'}</td>
+      <td>${esc(r.model)}</td>
+      <td class="question">${esc(r.question || '—')}</td>
     </tr>`).join('') || '<tr><td colspan="4" style="color:#484f58">Brak aktywnych zapytań</td></tr>';
 
     // History table
@@ -586,11 +596,11 @@ async function refresh() {
 
     const hBody = document.querySelector('#history-table tbody');
     hBody.innerHTML = d.history.map(r => `<tr>
-      <td>${r.start}</td>
-      <td>${r.username || r.ip}</td>
+      <td>${esc(r.start)}</td>
+      <td>${esc(r.username || r.ip)}</td>
       <td>${fmt(r.duration)}</td>
-      <td class="status-${r.status}">${r.status === 'done' ? '✓' : '✗'}</td>
-      <td class="question">${r.question || '—'}</td>
+      <td class="status-${r.status === 'done' ? 'done' : 'error'}">${r.status === 'done' ? '✓' : '✗'}</td>
+      <td class="question">${esc(r.question || '—')}</td>
     </tr>`).join('') || '<tr><td colspan="5" style="color:#484f58">Brak zapytań</td></tr>';
 
     // Paginacja
@@ -858,7 +868,8 @@ def main():
         return
 
     # Auto-detekcja: jeśli LM Studio nie wymaga auth → wyłącz hasło studenta
-    if not lm_needs_auth and args.student_key:
+    # (ale NIE gdy tunel aktywny — wtedy hasło chroni publiczny URL)
+    if not lm_needs_auth and args.student_key and not args.tunnel:
         print(f"   ℹ️  LM Studio nie wymaga auth → hasło studenta wyłączone")
         args.student_key = None
 
