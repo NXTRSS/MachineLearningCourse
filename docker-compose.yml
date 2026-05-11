@@ -11,6 +11,8 @@ services:
       - pip-cache:/root/.cache/pip
     environment:
       - JUPYTER_ENABLE_LAB=yes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   pip-cache:
