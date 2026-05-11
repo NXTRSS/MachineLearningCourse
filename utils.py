@@ -647,6 +647,12 @@ def pick_best_model(available_models, preferred=None):
     return available_models[0] if available_models else None
 
 
+def _is_docker():
+    """Detect if running inside a Docker container."""
+    from pathlib import Path
+    return Path("/.dockerenv").exists()
+
+
 def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key=None, backend=None, ports=None):
     """Wykryj działający LLM i zwróć (client, instructor_client, model_name).
 
@@ -709,25 +715,38 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
                 lms_ports.append(p)
 
     def _try_lmstudio():
-        for port in lms_ports:
-            url = f"http://localhost:{port}"
-            print(f"Szukam LM Studio (port {port})...")
-            models = detect_lmstudio(url, api_key=api_key)
-            if not models and port == 1234:
-                models = _try_launch_lms() and detect_lmstudio(url, api_key=api_key)
-            if models:
-                picked = _pick(models)
-                print(f"✓ LM Studio (port {port})! Model: {picked}")
-                return _make_clients(url, "lm-studio", picked)
+        in_docker = _is_docker()
+        hosts = ["localhost"]
+        if in_docker:
+            hosts.append("host.docker.internal")
+        for host in hosts:
+            for port in lms_ports:
+                url = f"http://{host}:{port}"
+                label = f"port {port}" if host == "localhost" else f"{host}:{port}"
+                print(f"Szukam LM Studio ({label})...")
+                models = detect_lmstudio(url, api_key=api_key)
+                if not models and host == "localhost" and port == 1234:
+                    models = _try_launch_lms() and detect_lmstudio(url, api_key=api_key)
+                if models:
+                    picked = _pick(models)
+                    print(f"✓ LM Studio ({label})! Model: {picked}")
+                    return _make_clients(url, "lm-studio", picked)
         return None
 
     def _try_ollama():
-        print("Szukam lokalnej Ollamy (port 11434)...")
-        models = detect_ollama()
-        if models:
-            picked = _pick(models)
-            print(f"✓ Lokalna Ollama! Model: {picked}")
-            return _make_clients("http://localhost:11434", "ollama", picked)
+        in_docker = _is_docker()
+        hosts = ["localhost"]
+        if in_docker:
+            hosts.append("host.docker.internal")
+        for host in hosts:
+            label = "port 11434" if host == "localhost" else f"{host}:11434"
+            print(f"Szukam Ollamy ({label})...")
+            base = f"http://{host}:11434"
+            models = detect_ollama(base)
+            if models:
+                picked = _pick(models)
+                print(f"✓ Ollama ({label})! Model: {picked}")
+                return _make_clients(base, "ollama", picked)
         return None
 
     def _try_lecturer():
@@ -785,6 +804,9 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
         return result
 
     print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
+    if _is_docker():
+        print("💡 Docker: upewnij się, że LM Studio/Ollama działa na Twoim komputerze (nie w kontenerze).")
+        print("   connect_llm automatycznie szuka na host.docker.internal.")
     return None, None, None
 
 
