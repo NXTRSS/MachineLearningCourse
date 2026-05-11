@@ -61,6 +61,8 @@ parser.add_argument("--env-file", type=str, default=".env",
                     help="Ścieżka do pliku z kluczami (domyślnie .env)")
 parser.add_argument("--verbose", "-v", action="store_true",
                     help="Live dashboard w terminalu (domyślnie: cichy tryb z logami)")
+parser.add_argument("--tunnel", "-t", action="store_true",
+                    help="Uruchom Cloudflare Quick Tunnel (publiczny URL dla studentów na Colabie)")
 args = parser.parse_args()
 
 
@@ -761,6 +763,48 @@ def quiet_loop():
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════════
 
+def _start_tunnel(port):
+    """Start cloudflared quick tunnel, return (process, public_url)."""
+    import shutil
+    import subprocess
+    import re
+
+    if not shutil.which("cloudflared"):
+        print("❌ cloudflared nie jest zainstalowany.")
+        print("   Instalacja: brew install cloudflared  (macOS)")
+        print("              lub: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/")
+        return None, None
+
+    print(f"🌐 Uruchamiam Cloudflare Tunnel (port {port})...")
+    proc = subprocess.Popen(
+        ["cloudflared", "tunnel", "--url", f"http://localhost:{port}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    url = None
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        line = proc.stderr.readline()
+        if not line:
+            if proc.poll() is not None:
+                break
+            continue
+        match = re.search(r"(https://[a-z0-9-]+\.trycloudflare\.com)", line)
+        if match:
+            url = match.group(1)
+            break
+
+    if not url:
+        print("❌ Nie udało się uzyskać URL tunelu. Sprawdź połączenie z internetem.")
+        proc.kill()
+        return None, None
+
+    print(f"   ✅ Tunel aktywny!")
+    return proc, url
+
+
 def _get_local_ip():
     """Wykryj IP w sieci lokalnej (Wi-Fi / Ethernet)."""
     import socket
@@ -810,6 +854,15 @@ def main():
         print(f"   ℹ️  LM Studio nie wymaga auth → hasło studenta wyłączone")
         args.student_key = None
 
+    # Bezpieczeństwo: tunel wymaga hasła
+    if args.tunnel and not args.student_key:
+        print("⚠️  --tunnel wymaga --student-key (hasło dla studentów).")
+        print("   Bez hasła każdy z internetem mógłby korzystać z Twojego LLM-a!")
+        args.student_key = input("   Podaj hasło (np. 'alk-2026'): ").strip()
+        if not args.student_key:
+            print("❌ Hasło jest wymagane przy tunelowaniu. Uruchom ponownie z -s <hasło>.")
+            return
+
     # Uruchom proxy
     proxy_server = HTTPServer(("0.0.0.0", args.proxy_port), ProxyHandler)
     proxy_thread = threading.Thread(target=proxy_server.serve_forever, daemon=True)
@@ -832,6 +885,18 @@ def main():
         print(f"   🔓 Bez hasła — otwarty dostęp")
     print(f"   Ctrl+C aby zakończyć\n")
 
+    # ── Tunnel (opcjonalny) ──
+    tunnel_proc = None
+    tunnel_url = None
+    if args.tunnel:
+        tunnel_proc, tunnel_url = _start_tunnel(args.proxy_port)
+        if tunnel_url:
+            print(f"\n   🌐 URL dla Colab / zdalnych studentów:")
+            print(f"      LECTURER_SERVER = \"{tunnel_url}\"")
+            if args.student_key:
+                print(f"      Hasło: {'*' * len(args.student_key)}")
+            print()
+
     # Terminal: lekki tryb logów (domyślny) albo live dashboard (-v)
     if args.verbose:
         time.sleep(2)
@@ -849,6 +914,10 @@ def main():
                   f"błędy: {stats.errors}")
         proxy_server.shutdown()
         dashboard_server.shutdown()
+        if tunnel_proc:
+            tunnel_proc.kill()
+            tunnel_proc.wait()
+            print("  Tunel zamknięty.")
 
 
 if __name__ == "__main__":
