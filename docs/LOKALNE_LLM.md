@@ -182,3 +182,11 @@ Upewnij się że masz zainstalowane [Visual C++ Redistributable](https://aka.ms/
 - **Dużo RAM (16 GB+)** → `qwen3.5:9b` lub `gemma4:12b` w LM Studio
 
 Na zajęciach serwer prowadzącego jest zawsze dostępny jako backup — nie musisz mieć lokalnego modelu, żeby uczestniczyć w zajęciach.
+
+---
+
+## Docker (Plan B) — ważna uwaga
+
+Jeśli korzystasz z Dockera (Plan B), zainstaluj LM Studio / Ollamę **na swoim komputerze**, nie w kontenerze Docker. Notebook automatycznie wykryje LLM na hoście.
+
+> **Dlaczego nie w Dockerze?** Na Macu z Apple Silicon Docker nie ma dostępu do GPU — model działałby 10-15x wolniej. Na Windowsie/Linuksie z kartą NVIDIA jest to możliwe, ale niepotrzebnie komplikuje konfigurację.
