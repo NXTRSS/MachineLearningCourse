@@ -87,7 +87,7 @@ Files to modify:
 Files to read (not modify):
   _rag_smart_search_notes.py  — source for context stuffing code + test queries
   Function_Calling.ipynb      — reference for search_presidents() + setup pattern
-  prezydenci_polski.txt       — RAG data source (unchanged)
+  prezydenci_polski_biografie.txt — RAG data source (738-line biographies, new)
   prezydenci_polski.md        — context stuffing data source (structured, used by FC)
   utils.py                    — connect_llm, setup_auth_client, ensure_package
 ```
@@ -396,7 +396,7 @@ git commit -m "RAG notebook: add context stuffing section with exercise + compar
 **Files:**
 - Modify: `RAG_warsztat.ipynb` (reuse/adapt existing cells from current notebook)
 
-These sections are mostly intact from the current notebook. The key change: better introduction text referencing the 3-method table, and the data source is `prezydenci_polski.txt` (the long-form text, not the structured `.md`).
+These sections are mostly intact from the current notebook. The key change: better introduction text referencing the 3-method table, and the data source is `prezydenci_polski_biografie.txt` (738-line biographies, not the short 55-line `.txt` or the structured `.md`).
 
 - [ ] **Step 1: Add section 6 — document loading + chunking**
 
@@ -405,7 +405,7 @@ Markdown header:
 ```markdown
 ## 6. Przygotowanie dokumentów — chunking
 
-Mamy plik `prezydenci_polski.txt` z artykułem o prezydentach Polski.
+Mamy plik `prezydenci_polski_biografie.txt` z rozbudowanymi biografiami prezydentów Polski.
 Zanim zbudujemy RAG, musimy podzielić tekst na **fragmenty (chunks)**.
 
 ### Dlaczego dzielimy na fragmenty?
