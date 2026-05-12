@@ -1,21 +1,16 @@
-# python==3.9.*
-tensorflow>=2.16
+# Bazowe pakiety — lekki obraz Docker.
+# Ciężkie zależności (tensorflow, nltk, gensim, …) instalowane
+# on-demand przez ensure_package() w konkretnych notebookach.
 pillow>=9.4.0
 pandas>=1.4.1
 scikit-learn>=1.0.2
 seaborn>=0.13.0
 plotly>=5.1.0
-pydot>=1.4.2
+pydot>=2.0
 graphviz>=0.20.3
 jupyterlab>=4.2.5
 matplotlib>=3.7.0
 ipywidgets>=8.1.2
 ipykernel
-gdown
-nltk
-spacy>=3.7,<3.8
-gensim>=4.3.0
-svgling>=0.3.1
-sentence-transformers
 openai
 requests
