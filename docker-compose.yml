@@ -3,6 +3,7 @@ services:
     build: .
     ports:
       - "8888:8888"
+      - "7860:7860"  # Gradio Chat UI (sekcja 13 notebooka Function_Calling)
     volumes:
       # Notebooki i pliki projektu - zmiany zapisują się na dysku hosta
       - .:/app
