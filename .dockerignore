@@ -9,3 +9,4 @@
 !chat_ui.py
 !chat_demo.py
 !llm_proxy.py
+!verify_env.py
