@@ -1,7 +1,7 @@
-.git
-.gitignore
-.ipynb_checkpoints
-__pycache__
-*.pyc
-.DS_Store
-docs/
+# Ignoruj wszystko…
+*
+
+# …oprócz plików potrzebnych w obrazie Docker:
+!*.ipynb
+!utils.py
+!requirements.txt
