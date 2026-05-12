@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 import urllib
 import os
+os.environ.setdefault("USE_TF", "0")
 import matplotlib.pyplot as plt
 import io
 
