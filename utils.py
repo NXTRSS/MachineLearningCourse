@@ -8,33 +8,52 @@ import os
 import matplotlib.pyplot as plt
 import io
 
+_GITHUB_RAW = "https://raw.githubusercontent.com/NXTRSS/MachineLearningCourse/main"
+_GITHUB_RELEASE = "https://github.com/NXTRSS/MachineLearningCourse/releases/download/data-v1"
+
 DATA_FILES = {
     "catvsnotcat": {
-        "file_id": "1KE3IOH0OxPI5QTeV2WI9Oi8GIVTBC8vw",
-        "filename": "catvsnotcat.pkl"
+        "url": f"{_GITHUB_RELEASE}/catvsnotcat.pkl",
+        "filename": "catvsnotcat.pkl",
     },
     "data_houses": {
-        "file_id": "1CAF1VATIvKNtQXpXo4VvVxrFi_t75Qea",
-        "filename": "data_houses.csv"
-    }
+        "url": f"{_GITHUB_RAW}/data_houses.csv",
+        "filename": "data_houses.csv",
+    },
+    "prng_miejscowosci": {
+        "url": f"{_GITHUB_RAW}/PRNG_MIEJSCOWOSCI_05_2021.csv",
+        "filename": "PRNG_MIEJSCOWOSCI_05_2021.csv",
+    },
 }
 
-def download_file(file_id, filename):
+def download_file(url, filename):
     """
-    Funkcja do pobrania pliku, jeśli jeszcze go nie ma.
-    Sprawdza, czy plik istnieje, jeśli nie, pobiera go.
+    Pobiera plik z podanego URL, jeśli jeszcze go nie ma na dysku.
+    Używa requests (streaming) — działa na local env, Docker i Colab.
     """
-    url = f"https://drive.google.com/uc?id={file_id}"
-
     if not os.path.exists(filename):
         print(f"Plik {filename} nie istnieje, pobieram...")
         try:
-            import gdown
-            gdown.download(url, filename, quiet=False)
-            print(f"Plik {filename} został pomyślnie pobrany!")
-        except ImportError:
-            print(f"ERROR: Pakiet 'gdown' nie jest zainstalowany. Zainstaluj go: pip install gdown")
+            import requests as _req
+            resp = _req.get(url, stream=True, allow_redirects=True, timeout=300)
+            resp.raise_for_status()
+            # content-length bywa niedostępny lub zaniżony (gzip) → progress opcjonalny
+            total = int(resp.headers.get("content-length", 0))
+            downloaded = 0
+            with open(filename, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=1 << 20):   # 1 MB
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total and total >= downloaded:
+                        pct = downloaded * 100 // total
+                        print(f"\r  {pct}% ({downloaded >> 20}/{total >> 20} MB)", end="", flush=True)
+                    else:
+                        print(f"\r  {downloaded >> 20} MB", end="", flush=True)
+            print(f"\nPlik {filename} został pomyślnie pobrany!")
         except Exception as e:
+            # Usuń częściowo pobrany plik
+            if os.path.exists(filename):
+                os.remove(filename)
             print(f"Błąd podczas pobierania pliku {filename}: {e}")
     else:
         print(f"Plik {filename} już istnieje, nie trzeba pobierać.")
@@ -42,18 +61,18 @@ def download_file(file_id, filename):
 def check_and_download_data(files_to_check=None):
     """
     Sprawdza, czy określone dane są dostępne i pobiera je, jeśli to konieczne.
-    
+
     Parametr:
-        files_to_check (list): Lista nazw plików do sprawdzenia i pobrania. Jeśli None, sprawdzane są wszystkie pliki w DATA_FILES.
+        files_to_check (list): Lista nazw plików do sprawdzenia i pobrania.
+                               Jeśli None, sprawdzane są wszystkie pliki w DATA_FILES.
     """
     if files_to_check is None:
-        # Jeśli nie podano listy, sprawdzają się wszystkie pliki
         files_to_check = DATA_FILES.keys()
-    
+
     for key in files_to_check:
         if key in DATA_FILES:
             data = DATA_FILES[key]
-            download_file(data["file_id"], data["filename"])
+            download_file(data["url"], data["filename"])
         else:
             print(f"Błąd: {key} nie jest zdefiniowany w DATA_FILES.")
 
