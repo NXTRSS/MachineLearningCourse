@@ -5,4 +5,7 @@
 !*.ipynb
 !utils.py
 !requirements.txt
-!prezydenci_polski.txt
+!prezydenci_polski.md
+!chat_ui.py
+!chat_demo.py
+!llm_proxy.py
