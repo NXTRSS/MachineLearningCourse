@@ -102,12 +102,15 @@ def wyczysc_i_przygotuj(path: Path):
                 komórki_zwinięte += 1
 
         # ── 4b. Zwiń sekcje dodatkowe (## Xb., ## Xc. itd.) ────────────────
-        # Podsekcje oznaczone literą (10b., 8b.) zwijamy domyślnie —
+        # Podsekcje oznaczone literą (3b., 10b.) zwijamy domyślnie —
         # to materiał dodatkowy, student może rozwinąć jeśli chce.
+        # Wyjątek: 8b (prompt injection) — to główna treść, nie zwijać.
+        NIE_ZWIJAJ = {"8b"}
         if cell["cell_type"] == "markdown":
             src = "".join(cell.get("source", []))
             first_line = src.lstrip().split("\n")[0]
-            if re.match(r"^##\s+\d+[b-z]\.", first_line):
+            m = re.match(r"^#{2,3}\s+(\d+[b-z])\.", first_line)
+            if m and m.group(1) not in NIE_ZWIJAJ:
                 cell.setdefault("metadata", {})["jp-MarkdownHeadingCollapsed"] = True
                 komórki_zwinięte += 1
 
