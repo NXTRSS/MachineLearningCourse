@@ -860,16 +860,16 @@ def setup_auth_client(client, instructor_client, model_name):
     except Exception:
         pass
 
-    if not needs_password:
-        # Serwer nie wymaga auth — nic nie zmieniaj
-        return client, instructor_client
-
-    # ── Serwer wymaga auth → imię + hasło ──
-    import getpass as _gp
+    # ── Serwer zdalny → zawsze pytaj o imię, hasło tylko gdy wymagane ──
     from openai import OpenAI
 
     student_name = input("👤 Twoje imię: ").strip() or "Anonim"
-    student_key = _gp.getpass("🔑 Hasło (prowadzący poda na zajęciach): ")
+
+    if needs_password:
+        import getpass as _gp
+        student_key = _gp.getpass("🔑 Hasło (prowadzący poda na zajęciach): ")
+    else:
+        student_key = None
 
     new_client = OpenAI(
         base_url=base_url,
