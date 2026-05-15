@@ -842,7 +842,7 @@ def setup_auth_client(client, instructor_client, model_name):
         return client, instructor_client
 
     base_url = str(getattr(client, "base_url", ""))
-    is_local = "localhost" in base_url or "127.0.0.1" in base_url or "host.docker.internal" in base_url
+    is_local = "localhost" in base_url or "127.0.0.1" in base_url
     if is_local:
         return client, instructor_client
 
