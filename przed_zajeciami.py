@@ -14,6 +14,12 @@ Co robi:
   6. Resetuje API_KEY do None (żeby klucz prowadzącego nie wyciekł do repo)
   7. Resetuje LECTURER_SERVER do placeholdera (żeby IP prowadzącego nie wyciekł)
   8. Zapisuje — notebook gotowy dla studentów
+  9. Generuje ściągawki z odpowiedziami do ._odp/ (ukryty folder)
+
+Ściągawki do live codingu:
+  Folder ._odp/ jest ukryty w JupyterLab (dotfile).
+  Odpal osobnego JupyterLab w drugim oknie:
+    jupyter lab --port 8889 --notebook-dir=._odp --browser=chrome
 
 Patrz: STUBY_RESETOWANIE.md — jak oznaczać komórki jako student-stub.
 """
@@ -110,9 +116,12 @@ def wyczysc_i_przygotuj(path: Path):
             src = "".join(cell.get("source", []))
             first_line = src.lstrip().split("\n")[0]
             m = re.match(r"^#{2,3}\s+(\d+[b-z])\.", first_line)
-            if m and m.group(1) not in NIE_ZWIJAJ:
-                cell.setdefault("metadata", {})["jp-MarkdownHeadingCollapsed"] = True
-                komórki_zwinięte += 1
+            if m:
+                if m.group(1) not in NIE_ZWIJAJ:
+                    cell.setdefault("metadata", {})["jp-MarkdownHeadingCollapsed"] = True
+                    komórki_zwinięte += 1
+                else:
+                    cell.get("metadata", {}).pop("jp-MarkdownHeadingCollapsed", None)
 
         # ── 5. Zakomentuj backend=/ports= w connect_llm ─────────────────────
         # Prowadzący może odkomentować na swoim laptopie.
@@ -196,6 +205,164 @@ def wyczysc_i_przygotuj(path: Path):
         print(f"    — zresetowano {lecturer_zresetowane} linii LECTURER_SERVER do placeholdera")
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 9. Generowanie ściągawek z odpowiedziami (._odp/)
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Otwórz w JupyterLab (ukryty folder, studenci nie widzą):
+#   http://localhost:8888/lab/tree/._odp
+#
+
+ODPOWIEDZI_DIR = "._odp"
+
+
+def _is_solution_header(source: str) -> bool:
+    return "Rozwiązanie" in source and "######" in source
+
+
+def _is_collapsible_header(source: str) -> bool:
+    stripped = source.strip()
+    if not stripped.startswith("######"):
+        return False
+    return (
+        "Rozwiązanie" in source
+        or "Podpowiedź" in source
+        or "Spodziewany wynik" in source
+        or stripped == "######"
+        or re.match(r"^######\s*$", stripped)
+        or re.match(r'^######\s*<span[^>]*>\s*</span>\s*$', stripped)
+    )
+
+
+def _is_section_heading(source: str) -> bool:
+    stripped = source.strip()
+    return bool(re.match(r"^#{1,5}\s", stripped)) and not stripped.startswith("######")
+
+
+def _find_exercise_title(cells, solution_header_idx: int):
+    """Walk backward from solution header to find the exercise title."""
+    for j in range(solution_header_idx - 1, max(solution_header_idx - 15, -1), -1):
+        cell = cells[j]
+        if cell["cell_type"] != "markdown":
+            continue
+        src = "".join(cell["source"]).strip()
+        if _is_collapsible_header(src):
+            continue
+        if "student-stub" in cell.get("metadata", {}).get("tags", []):
+            continue
+        if _is_section_heading(src) or src.startswith("##### ") or src.startswith("###### "):
+            return src
+        if "Ćwiczenie" in src or "Zadanie" in src or "ćwiczenie" in src:
+            return src.split("\n")[0].strip()
+    return None
+
+
+def _collect_solution_cells(cells, header_idx: int):
+    """Collect solution cells (code, or markdown with code fences) after a solution header."""
+    result = []
+    for j in range(header_idx + 1, min(len(cells), header_idx + 8)):
+        cell = cells[j]
+        src = "".join(cell["source"]).strip()
+        if cell["cell_type"] == "markdown":
+            if src.startswith("```"):
+                result.append(cell)
+            break
+        if "student-stub" in cell.get("metadata", {}).get("tags", []):
+            break
+        if not src:
+            continue
+        result.append(cell)
+    return result
+
+
+def generuj_odpowiedzi(repo: Path):
+    """Generuje notebooki-ściągawki z samymi odpowiedziami do ćwiczeń."""
+    out_dir = repo / ODPOWIEDZI_DIR
+    out_dir.mkdir(exist_ok=True)
+
+    generated = 0
+    for nazwa in NOTEBOOKI:
+        nb_path = repo / nazwa
+        if not nb_path.exists():
+            continue
+
+        with open(nb_path, encoding="utf-8") as f:
+            nb = json.load(f)
+
+        cells = nb["cells"]
+        exercises = []
+        exercise_num = 0
+
+        for i, cell in enumerate(cells):
+            if cell["cell_type"] != "markdown":
+                continue
+            src = "".join(cell["source"])
+            if not _is_solution_header(src):
+                continue
+            solution_cells = _collect_solution_cells(cells, i)
+            if not solution_cells:
+                continue
+            exercise_num += 1
+            title = _find_exercise_title(cells, i)
+            if title:
+                title = re.sub(r"^#{1,6}\s*", "", title)
+            exercises.append((title or f"Ćwiczenie {exercise_num}", solution_cells))
+
+        if not exercises:
+            continue
+
+        nb_name = nb_path.stem
+        output_cells = [
+            {"cell_type": "markdown", "metadata": {}, "source": [
+                f"# 📋 Odpowiedzi: {nb_name.replace('_', ' ')}\n\n"
+                f"*Wygenerowano automatycznie — nie commitować!*"
+            ]},
+        ]
+        for idx, (label, sol_cells) in enumerate(exercises, 1):
+            output_cells.append(
+                {"cell_type": "markdown", "metadata": {}, "source": [f"---\n### {idx}. {label}"]}
+            )
+            for sc in sol_cells:
+                if sc["cell_type"] == "code":
+                    src = sc["source"]
+                    if isinstance(src, list):
+                        src = "".join(src)
+                    output_cells.append({
+                        "cell_type": "code", "metadata": {},
+                        "source": [src], "outputs": [], "execution_count": None,
+                    })
+                else:
+                    src = "".join(sc["source"]) if isinstance(sc["source"], list) else sc["source"]
+                    output_cells.append(
+                        {"cell_type": "markdown", "metadata": {}, "source": [src]}
+                    )
+
+        answer_nb = {
+            "nbformat": nb.get("nbformat", 4),
+            "nbformat_minor": nb.get("nbformat_minor", 5),
+            "metadata": {
+                "kernelspec": nb.get("metadata", {}).get("kernelspec", {
+                    "display_name": "Python 3", "language": "python", "name": "python3",
+                }),
+                "language_info": nb.get("metadata", {}).get("language_info", {
+                    "name": "python", "version": "3.11.0",
+                }),
+            },
+            "cells": output_cells,
+        }
+
+        out_path = out_dir / f"{nb_name}_ODPOWIEDZI.ipynb"
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(answer_nb, f, ensure_ascii=False, indent=1)
+
+        n_exercises = len(exercises)
+        print(f"  ✅ {out_path.name}  ({n_exercises} ćwiczeń)")
+        generated += 1
+
+    return generated
+
+
 def main():
     repo = Path(__file__).parent
     print(f"\n{'='*55}")
@@ -209,6 +376,14 @@ def main():
             continue
         wyczysc_i_przygotuj(path)
         print()
+
+    # ── 9. Ściągawki z odpowiedziami ──────────────────────────────────────
+    print(f"{'─'*55}")
+    print(f"  Ściągawki z odpowiedziami → {ODPOWIEDZI_DIR}/\n")
+    generated = generuj_odpowiedzi(repo)
+    if generated:
+        print(f"\n  Otwórz: jupyter lab --port 8889 --notebook-dir={ODPOWIEDZI_DIR} --browser=chrome")
+    print()
 
     print("Gotowe — notebooki przygotowane dla studentów.\n")
 
