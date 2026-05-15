@@ -348,6 +348,15 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 return
             rate_limiter.record_success(client_ip)
 
+        # ── Wymuszenie imienia studenta ──
+        student_name = self.headers.get("X-Student-Name", "")
+        if not skip_auth and not student_name:
+            self._send_json_error(400,
+                "Brak nagłówka X-Student-Name. "
+                "Uruchom ponownie komórkę connect_llm — powinna zapytać o imię. "
+                "Jeśli nie pyta, zaktualizuj utils.py (git pull).")
+            return
+
         # Wyciągnij info z body (model, pytanie)
         model = "?"
         question = ""
@@ -363,9 +372,6 @@ class ProxyHandler(BaseHTTPRequestHandler):
                         question = last_user[-1].get("content", "")[:80]
             except (json.JSONDecodeError, AttributeError):
                 pass
-
-        # Nazwa studenta z nagłówka (wysyłana przez chat_ui)
-        student_name = self.headers.get("X-Student-Name", "")
 
         # Rejestruj zapytanie (pomijaj ping-like requesty jak /v1/models)
         is_chat = "/chat/completions" in path or "/completions" in path
@@ -897,6 +903,7 @@ def main():
     proxy_thread = threading.Thread(target=proxy_server.serve_forever, daemon=True)
     proxy_thread.start()
     print(f"   🔀 Proxy nasłuchuje na {bind_host}:{args.proxy_port}")
+    print(f"   👤 Wymagane podanie użytkownika (nagłówek X-Student-Name)")
 
     # Uruchom dashboard (zawsze localhost — tylko dla prowadzącego)
     dashboard_server = HTTPServer(("127.0.0.1", args.dashboard_port), DashboardHandler)
