@@ -14,9 +14,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Kopiujemy resztę plików projektu
 COPY . .
 
-# Instalujemy kernel Jupyter
-RUN python -m ipykernel install --user --name ml --display-name "Python (ml)"
-
 EXPOSE 8888
 
 CMD jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --IdentityProvider.token=''
