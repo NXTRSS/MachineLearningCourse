@@ -1,12 +1,12 @@
-# RAG Notebook Redesign — Status (2026-05-14)
+# RAG Notebook Redesign — Status (2026-05-15)
 
-## Stan: ✅ Redesign zrobiony, wymaga przetestowania na żywo
+## Stan: ✅ Redesign + ćwiczenia gotowe, wymaga przetestowania na żywo
 
 Branch: `docker-uv-setup` (pushed)
 
 ## Co się zmieniło
 
-Notebook przebudowany z 35 → 42 cells. Nowy flow:
+Notebook przebudowany z 35 → 60 cells. Nowy flow:
 
 ```
 Intro (most z FC) → Substring search → Context stuffing → Porównanie 3 metod
@@ -30,14 +30,24 @@ Intro (most z FC) → Substring search → Context stuffing → Porównanie 3 me
 ### Usunięte
 - `_rag_smart_search_notes.py` — treść wchłonięta do notebooka
 
+### Infrastruktura ćwiczeń (2026-05-15)
+- **4 student-stub cells** z tagami i szablonami (`student_stub_template` w metadata)
+- **Podpowiedzi** (collapsed): Ćw. 1, 3, 4 (ćw. 2 trywialne — tylko rozwiązanie)
+- **Rozwiązania** (collapsed): Wszystkie 4 ćwiczenia
+- **Separatory** (`###### `): Po każdym bloku podpowiedź/rozwiązanie
+- **try/except guards**: Stuby nie blokują Run All
+- **`przed_zajeciami.py`**: RAG notebook dodany do NOTEBOOKI — resetuje stuby, czyści outputy, zwija sekcje
+- **Ściągawka**: `RAG_warsztat_ODPOWIEDZI.ipynb` generowana automatycznie do `._odp/`
+
 ## Pliki
 
 | Plik | Status |
 |---|---|
-| `RAG_warsztat.ipynb` | Przebudowany (42 cells, 13 sekcji, 4 ćwiczenia) |
+| `RAG_warsztat.ipynb` | Przebudowany (60 cells, 13 sekcji, 4 ćwiczenia, podpowiedzi/rozwiązania) |
 | `prezydenci_polski_biografie.txt` | Nowy — rozbudowane biografie 7 prezydentów III RP |
 | `prezydenci_polski.md` | Bez zmian — używany przez substring search i context stuffing |
 | `prezydenci_polski.txt` | Bez zmian — stary plik, już nieużywany przez RAG |
+| `przed_zajeciami.py` | Zaktualizowany — RAG notebook w liście NOTEBOOKI |
 | `_rag_smart_search_notes.py` | Usunięty |
 
 ## Do przetestowania na żywo
@@ -47,9 +57,9 @@ Intro (most z FC) → Substring search → Context stuffing → Porównanie 3 me
 - [ ] Sprawdzić czy RAG z `prezydenci_polski_biografie.txt` (738 linii) daje lepsze chunki niż stary 55-liniowy plik
 - [ ] Sprawdzić czy t-SNE wizualizacja wygląda OK z większą liczbą chunków
 - [ ] Ćwiczenia — czy student-stuby mają sens, czy podpowiedzi wystarczą
+- [x] `przed_zajeciami.py` przetwarza RAG notebook (4 stuby, 7 collapses, outputy)
 
 ## Znane kwestie
 
 - `prezydenci_polski.txt` (55 linii) nadal leży w repo — nie jest używany, ale nie przeszkadza
-- `przed_zajeciami.py` nie przetwarza jeszcze RAG notebooka (brak student-stub tagów)
 - Nawrocki w `prezydenci_polski_biografie.txt` — dane na dzień pisania (maj 2026), mogą się zdezaktualizować
