@@ -14,10 +14,24 @@
 
 ## 🔧 Pierwsze uruchomienie (robimy raz)
 
+### Krok 0 — Git (potrzebny we wszystkich planach)
+
+Sprawdź czy masz Gita: `git --version`. Jeśli nie:
+
+| System | Komenda | Uwagi |
+|--------|---------|-------|
+| **Windows** | `winget install Git.Git` | Pojawi się okno UAC — kliknij **Tak** |
+| **macOS** | `xcode-select --install` | Wystarczy kliknąć **Install** w oknie dialogowym |
+| **Linux** | `sudo apt-get install git` | Wymaga hasła administratora |
+
+Po instalacji zamknij i otwórz ponownie terminal.
+
+---
+
 ### Plan A — uv
 
 ```bash
-# 1. Zainstaluj uv (jednorazowo)
+# 1. Zainstaluj uv (jednorazowo, bez uprawnień administratora)
 curl -LsSf https://astral.sh/uv/install.sh | sh    # macOS / Linux
 winget install astral-sh.uv                         # Windows (PowerShell)
 
