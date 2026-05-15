@@ -26,20 +26,31 @@ Powinno się wyświetlić coś w stylu: `Docker version 27.x.x, build ...`
 Jeśli pojawia się błąd — upewnij się, że Docker Desktop jest uruchomiony (ikonka w zasobniku systemowym / pasku menu).
 
 
-## Krok 3: Pobranie plików z zajęć
+## Krok 3: Instalacja Git
+
+Sprawdź czy masz Gita: `git --version`. Jeśli nie:
+
+| System | Komenda | Uwagi |
+|--------|---------|-------|
+| **Windows** | `winget install Git.Git` | Pojawi się okno UAC — kliknij **Tak** |
+| **macOS** | `xcode-select --install` | Kliknij **Install** w oknie dialogowym |
+| **Linux** | `sudo apt-get install git` | Wymaga hasła administratora |
+
+Po instalacji zamknij i otwórz ponownie terminal.
+
+
+## Krok 4: Pobranie plików z zajęć
 
 ```bash
 git clone https://github.com/NXTRSS/MachineLearningCourse
 cd MachineLearningCourse
 ```
 
-Jeśli nie masz `git`, możesz też:
-1. Wejść na https://github.com/NXTRSS/MachineLearningCourse
-2. Kliknąć zielony przycisk **Code** → **Download ZIP**
-3. Wypakować archiwum i otworzyć terminal w tym folderze
+> **Nie możesz zainstalować Gita?** Wejdź na https://github.com/NXTRSS/MachineLearningCourse → zielony przycisk **Code** → **Download ZIP**. Wypakuj i otwórz terminal w tym folderze.
+> ⚠️ Bez Gita nie będziesz mógł pobierać aktualizacji materiałów (`git pull`).
 
 
-## Krok 4: Uruchomienie środowiska
+## Krok 5: Uruchomienie środowiska
 
 W terminalu, będąc w folderze `MachineLearningCourse`, wpisz:
 
@@ -56,7 +67,7 @@ jupyter  |     http://127.0.0.1:8888/lab
 ```
 
 
-## Krok 5: Otwarcie JupyterLab
+## Krok 6: Otwarcie JupyterLab
 
 Otwórz przeglądarkę i wejdź na adres:
 
@@ -65,7 +76,7 @@ Otwórz przeglądarkę i wejdź na adres:
 Zobaczysz JupyterLab z plikami z zajęć. Gotowe!
 
 
-## Krok 6: Weryfikacja
+## Krok 7: Weryfikacja
 
 W JupyterLab otwórz **Terminal** (File → New → Terminal) i wpisz:
 
