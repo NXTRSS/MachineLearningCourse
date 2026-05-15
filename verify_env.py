@@ -2,68 +2,70 @@ import sys
 import subprocess
 import shutil
 from importlib.metadata import version, PackageNotFoundError
+from packaging.version import Version
 
+# Minimalne wersje — muszą być spójne z pyproject.toml
 required_packages = {
-    "tensorflow": "2.15.0",
+    "tensorflow": "2.20",
     "pillow": "9.4.0",
-    "pandas": "1.4.1",
-    "scikit-learn": "1.0.2",
-    "seaborn": "0.11.2",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.6.0",
+    "seaborn": "0.13.0",
     "plotly": "5.1.0",
-    "pydot": "1.4.2",
+    "pydot": "2.0",
     "jupyterlab": "4.2.5",
-    "matplotlib": "3.4.3",
+    "matplotlib": "3.9.2",
     "ipywidgets": "8.1.2",
+    "gensim": "4.4.0",
+    "spacy": "3.8.7",
+    "openai": "1.0.0",
 }
 
 all_ok = True
 
 print("Checking Python version...\n")
 python_version = sys.version_info
-expected_python_version = (3, 9)
-if (python_version.major, python_version.minor) == expected_python_version:
-    print(f"Python Version: OK (Version {'.'.join(map(str, python_version[:3]))})")
+if python_version >= (3, 11):
+    print(f"Python Version: OK ({'.'.join(map(str, python_version[:3]))})")
 else:
-    print(f"WARNING: Python Version: {'.'.join(map(str, python_version[:3]))} (Expected: 3.9.x)")
+    print(f"ERROR: Python {'.'.join(map(str, python_version[:3]))} — wymagany >= 3.11")
     all_ok = False
 
 print("\nChecking installed packages...\n")
-for package, expected_version in required_packages.items():
+for package, min_ver in required_packages.items():
     try:
-        installed_version = version(package)
-        if installed_version == expected_version:
-            print(f"Package {package}: OK (Version {installed_version})")
+        installed = version(package)
+        if Version(installed) >= Version(min_ver):
+            print(f"  {package}: OK ({installed})")
         else:
-            print(f"WARNING: Package {package}: Found Version {installed_version} (Expected: {expected_version})")
+            print(f"  {package}: WARNING — {installed} < {min_ver} (wymagane >= {min_ver})")
+            all_ok = False
     except PackageNotFoundError:
-        print(f"ERROR: Package {package}: NOT INSTALLED")
+        print(f"  {package}: ERROR — nie zainstalowany!")
         all_ok = False
 
 print("\nChecking system-level packages...\n")
 
-# Sprawdzenie graphviz — działa niezależnie od conda/docker/uv
+# Sprawdzenie graphviz
 if shutil.which("dot"):
     try:
         result = subprocess.run(
             ["dot", "-V"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
         graphviz_info = result.stderr.strip() or result.stdout.strip()
-        print(f"Package graphviz: OK ({graphviz_info})")
+        print(f"  graphviz: OK ({graphviz_info})")
     except Exception:
-        print("Package graphviz: OK (found in PATH)")
+        print("  graphviz: OK (found in PATH)")
 else:
-    print("WARNING: Package graphviz: NOT FOUND in PATH")
-    print("  -> Docker/uv: graphviz powinien być zainstalowany automatycznie")
-    print("  -> Conda: conda install graphviz")
-    print("  -> Linux: sudo apt-get install graphviz")
-    print("  -> Mac: brew install graphviz")
-    print("  -> Windows: https://graphviz.org/download/")
+    print("  graphviz: NOT FOUND")
+    print("    macOS:   brew install graphviz")
+    print("    Linux:   sudo apt-get install graphviz")
+    print("    Windows: https://graphviz.org/download/")
+    all_ok = False
 
-print("\nEnvironment verification: ", end="")
+print()
 if all_ok:
-    print("OK")
+    print("Environment verification: OK")
 else:
-    print("WARNINGS DETECTED.")
-    print("\nSome packages have mismatched versions or are missing.")
-    print("While the environment may be functional, it is recommended")
-    print("to align package versions to ensure consistency.")
+    print("Environment verification: PROBLEMS DETECTED")
+    print("Sprawdź powyższe błędy i uruchom ponownie.")
