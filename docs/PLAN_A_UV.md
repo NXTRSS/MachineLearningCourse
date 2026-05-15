@@ -34,20 +34,61 @@ uv --version
 Powinno wyświetlić coś w stylu: `uv 0.6.x`
 
 
-## Krok 2: Pobranie plików z zajęć
+## Krok 2: Instalacja Git
+
+Sprawdź czy masz Gita:
+
+```bash
+git --version
+```
+
+Jeśli komenda zwraca wersję (np. `git version 2.x`) — przejdź do **Kroku 3**.
+
+Jeśli nie masz Gita:
+
+### Windows (PowerShell)
+
+```powershell
+winget install Git.Git
+```
+
+> Pojawi się okno UAC (kontrola konta użytkownika) — kliknij **Tak**. Po instalacji zamknij i otwórz ponownie PowerShell.
+
+### macOS
+
+```bash
+xcode-select --install
+```
+
+Pojawi się okno dialogowe — kliknij **Install**. Instalacja trwa 1-2 minuty.
+
+> Alternatywa jeśli masz Homebrew: `brew install git` (nie wymaga uprawnień administratora).
+
+### Linux (Ubuntu / Debian)
+
+```bash
+sudo apt-get install git
+```
+
+> Wymaga hasła administratora (`sudo`).
+
+
+## Krok 3: Pobranie plików z zajęć
 
 ```bash
 git clone https://github.com/NXTRSS/MachineLearningCourse
 cd MachineLearningCourse
 ```
 
-Jeśli nie masz `git`, możesz też:
-1. Wejść na https://github.com/NXTRSS/MachineLearningCourse
-2. Kliknąć zielony przycisk **Code** → **Download ZIP**
-3. Wypakować archiwum i otworzyć terminal w tym folderze
+> **Nie możesz zainstalować Gita?** Alternatywnie:
+> 1. Wejdź na https://github.com/NXTRSS/MachineLearningCourse
+> 2. Kliknij zielony przycisk **Code** → **Download ZIP**
+> 3. Wypakuj archiwum i otwórz terminal w tym folderze
+>
+> ⚠️ Bez Gita nie będziesz mógł pobierać aktualizacji materiałów (`git pull`).
 
 
-## Krok 3: Stworzenie środowiska i instalacja pakietów
+## Krok 4: Stworzenie środowiska i instalacja pakietów
 
 W folderze `MachineLearningCourse` wpisz:
 
@@ -63,14 +104,14 @@ To **jedyna komenda** — `uv` automatycznie:
 Może to potrwać kilka minut przy pierwszym uruchomieniu.
 
 
-## Krok 4: Instalacja kernela Jupyter
+## Krok 5: Instalacja kernela Jupyter
 
 ```bash
 uv run python -m ipykernel install --user --name ml --display-name "Python (ml)"
 ```
 
 
-## Krok 5: Uruchomienie JupyterLab
+## Krok 6: Uruchomienie JupyterLab
 
 ```bash
 uv run jupyter lab
@@ -81,7 +122,7 @@ Otworzy się przeglądarka z JupyterLab. Gotowe!
 **Ważne:** W JupyterLab jako kernel wybierz **"Python (ml)"**.
 
 
-## Krok 6: Weryfikacja
+## Krok 7: Weryfikacja
 
 W JupyterLab otwórz Terminal (File → New → Terminal) i wpisz:
 
@@ -120,6 +161,7 @@ Jeśli nie masz `brew`: https://brew.sh
 ```bash
 sudo apt-get install graphviz
 ```
+> Wymaga hasła administratora (`sudo`).
 
 
 ## Rozwiązywanie problemów

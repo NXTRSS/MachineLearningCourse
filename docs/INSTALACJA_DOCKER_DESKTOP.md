@@ -11,6 +11,8 @@ Docker Desktop to aplikacja, która pozwala uruchamiać kontenery (gotowe, zamkn
 
 ### Krok 1: Włączenie WSL2
 
+> ⚠️ **Ten krok wymaga uprawnień administratora.**
+
 Otwórz **PowerShell jako administrator** (kliknij prawym przyciskiem na Start → "Windows PowerShell (Administrator)" lub "Terminal (Administrator)") i wpisz:
 
 ```powershell
@@ -18,6 +20,8 @@ wsl --install
 ```
 
 Zrestartuj komputer po zakończeniu instalacji.
+
+> **Na komputerze uczelnianym/firmowym** bez uprawnień administratora WSL2 może być zablokowany. Zapytaj dział IT lub skorzystaj z [Planu A (uv)](PLAN_A_UV.md) albo [Planu C (Colab)](PLAN_C_COLAB.md).
 
 Po restarcie, otwórz ponownie PowerShell i sprawdź:
 
@@ -72,11 +76,12 @@ Jeśli powyższe kroki sprawiają trudności, polecam ten poradnik wideo (po ang
 3. Otwórz pobrany plik `.dmg`
 4. Przeciągnij ikonkę Docker do folderu **Applications**
 5. Uruchom Docker z folderu Applications
-6. Zaakceptuj warunki licencji — kliknij **"Accept"**
-7. Pojawi się ekran logowania — **konto Docker nie jest potrzebne**. Kliknij **"Continue without signing in"** (małe szare łącze na dole ekranu)
-8. Pojawi się ekran powitalny / tutorial — możesz go zamknąć (X) lub kliknąć **"Skip"**
-9. Poczekaj aż Docker się uruchomi — ikonka wieloryba 🐳 pojawi się na pasku menu u góry ekranu
-10. Otwórz Terminal i sprawdź: `docker --version`
+6. macOS poprosi o hasło administratora (instalacja komponentów sieciowych) — wpisz hasło
+7. Zaakceptuj warunki licencji — kliknij **"Accept"**
+8. Pojawi się ekran logowania — **konto Docker nie jest potrzebne**. Kliknij **"Continue without signing in"** (małe szare łącze na dole ekranu)
+9. Pojawi się ekran powitalny / tutorial — możesz go zamknąć (X) lub kliknąć **"Skip"**
+10. Poczekaj aż Docker się uruchomi — ikonka wieloryba 🐳 pojawi się na pasku menu u góry ekranu
+11. Otwórz Terminal i sprawdź: `docker --version`
 
 ### Wizualny poradnik instalacji na macOS
 
@@ -91,6 +96,8 @@ Jeśli powyższe kroki sprawiają trudności, polecam ten poradnik wideo (po ang
 Na Linuksie można zainstalować Docker Engine bezpośrednio (bez Docker Desktop), co jest lżejsze.
 
 ### Instalacja Docker Engine
+
+> ⚠️ **Większość poniższych komend wymaga uprawnień administratora (`sudo`).**
 
 Otwórz terminal i wykonaj po kolei:
 
