@@ -708,7 +708,21 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
     def _make_clients(base_url, default_key, model):
         """Tworzy oba klienty: zwykły + instructor."""
         key = api_key or default_key  # jawny api_key ma priorytet
-        client = OpenAI(base_url=f"{base_url}/v1", api_key=key)
+
+        # Docker → host.docker.internal = LLM prowadzącego, nie swój
+        # Pytamy o imię żeby prowadzący widział kto się łączy
+        headers = {}
+        is_remote_host = "host.docker.internal" in base_url
+        if is_remote_host:
+            student_name = input("👤 Twoje imię: ").strip() or "Anonim"
+            headers["X-Student-Name"] = student_name
+            print(f"  Łączę jako: {student_name}")
+
+        client = OpenAI(
+            base_url=f"{base_url}/v1",
+            api_key=key,
+            default_headers=headers or None,
+        )
         try:
             import instructor
             instr = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
