@@ -8,6 +8,8 @@ Uruchomienie:
     python chat_demo.py --backend ollama -m e4b       # Ollama + konkretny model
     python chat_demo.py --port 4242                   # konkretny port LM Studio
     python chat_demo.py --port 4242 --api-key alk-2026  # LM Studio z kluczem API
+    python chat_demo.py --server http://192.168.1.50:4242  # serwer prowadzącego (LAN)
+    python chat_demo.py -s http://192.168.1.50:4242 -k alk-2026  # serwer + hasło
     python chat_demo.py --model gemma                 # partial match na nazwie modelu
 
 Otwiera w przeglądarce interfejs ChatGPT-like z:
@@ -41,7 +43,9 @@ parser = argparse.ArgumentParser(description="Chat z narzędziami — Function C
 parser.add_argument("--model", "-m", type=str, default=None,
                     help="Nazwa modelu (partial match, np. 'gemma')")
 parser.add_argument("--port", "-p", type=int, default=None,
-                    help="Port LM Studio (np. 4242)")
+                    help="Port LM Studio na localhost (np. 4242)")
+parser.add_argument("--server", "-s", type=str, default=None,
+                    help="Pełny URL serwera prowadzącego (np. 'http://192.168.1.50:4242')")
 parser.add_argument("--backend", "-b", type=str, default=None,
                     choices=["ollama", "lmstudio"],
                     help="Wymuszony backend: 'ollama' lub 'lmstudio' (domyślnie: auto-detect)")
@@ -54,24 +58,37 @@ args = parser.parse_args()
 
 # ── Połączenie z LLM ─────────────────────────────────────────────────
 
-if args.port:
-    # Bezpośrednie połączenie na podany port
+if args.port or args.server:
+    # Bezpośrednie połączenie: --port (localhost) lub --server (pełny URL)
     from openai import OpenAI
     import instructor
 
-    base_url = f"http://localhost:{args.port}/v1"
+    if args.server:
+        server_url = args.server.rstrip("/")
+        base_url = f"{server_url}/v1" if not server_url.endswith("/v1") else server_url
+    else:
+        base_url = f"http://localhost:{args.port}/v1"
+
     key = args.api_key or "lm-studio"
     _needs_gui_auth = False
 
+    # ── Pytanie o imię studenta (serwer zdalny) ──
+    _default_headers = {}
+    if args.server:
+        student_name = input("👤 Twoje imię: ").strip() or "Anonim"
+        _default_headers["X-Student-Name"] = student_name
+        print(f"  Łączę jako: {student_name}")
+
     def _try_connect(api_key):
-        c = OpenAI(base_url=base_url, api_key=api_key)
+        c = OpenAI(base_url=base_url, api_key=api_key,
+                   default_headers=_default_headers or None)
         models = [m.id for m in c.models.list().data]
         return c, models
 
     try:
         client, models = _try_connect(key)
     except Exception as e:
-        print(f"❌ Nie mogę połączyć się z localhost:{args.port}")
+        print(f"❌ Nie mogę połączyć się z {base_url}")
         print(f"   Szczegóły: {e}")
         raise SystemExit(1)
 
@@ -84,6 +101,7 @@ if args.port:
             probe = _req.post(
                 f"{base_url}/chat/completions",
                 json={"model": "test", "messages": []},
+                headers=_default_headers,
                 timeout=3,
             )
             if probe.status_code in (401, 403):
