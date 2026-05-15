@@ -74,16 +74,8 @@ if args.port or args.server:
     key = args.api_key or "lm-studio"
     _needs_gui_auth = False
 
-    # ── Pytanie o imię studenta (serwer zdalny) ──
-    _default_headers = {}
-    if args.server:
-        student_name = input("👤 Twoje imię: ").strip() or "Anonim"
-        _default_headers["X-Student-Name"] = student_name
-        print(f"  Łączę jako: {student_name}")
-
     def _try_connect(api_key):
-        c = OpenAI(base_url=base_url, api_key=api_key,
-                   default_headers=_default_headers or None)
+        c = OpenAI(base_url=base_url, api_key=api_key)
         models = [m.id for m in c.models.list().data]
         return c, models
 
@@ -103,7 +95,6 @@ if args.port or args.server:
             probe = _req.post(
                 f"{base_url}/chat/completions",
                 json={"model": "test", "messages": []},
-                headers=_default_headers,
                 timeout=3,
             )
             if probe.status_code in (401, 403):
@@ -455,8 +446,8 @@ if __name__ == "__main__":
             except Exception:
                 return False
 
-    # Proxy + auth → username + password; proxy bez auth → tylko username
-    _is_proxy = args.port is not None
+    # Proxy / serwer zdalny → pytaj o imię w Gradio
+    _is_proxy = args.port is not None or args.server is not None
     _ask_user = _is_proxy and not _needs_gui_auth
 
     launch_chat(
