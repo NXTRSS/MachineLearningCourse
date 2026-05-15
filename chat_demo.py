@@ -65,6 +65,8 @@ if args.port or args.server:
 
     if args.server:
         server_url = args.server.rstrip("/")
+        if not server_url.startswith("http"):
+            server_url = f"http://{server_url}"
         base_url = f"{server_url}/v1" if not server_url.endswith("/v1") else server_url
     else:
         base_url = f"http://localhost:{args.port}/v1"
