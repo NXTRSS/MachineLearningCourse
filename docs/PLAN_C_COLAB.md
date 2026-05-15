@@ -24,14 +24,14 @@ Jest to **rozwiązanie awaryjne** — działa zawsze, ale ma ograniczenia (sesje
 Na samym początku notebooka (przed pierwszą komórką z kodem) dodaj nową komórkę i wklej:
 
 ```python
-!pip install tensorflow==2.15 pillow==9.4.0 pandas==1.4.1 scikit-learn==1.0.2 \
-    seaborn==0.11.2 plotly==5.1.0 pydot==1.4.2 graphviz==0.20.3 \
-    matplotlib==3.4.3 ipywidgets==8.1.2 gdown
+!pip install -q tensorflow>=2.20 pillow>=9.4.0 pandas>=2.2.3 scikit-learn>=1.6.0 \
+    seaborn>=0.13.0 plotly>=5.1.0 pydot>=2.0 graphviz>=0.20.3 \
+    matplotlib>=3.9.2 ipywidgets>=8.1.2 gdown packaging
 ```
 
 Uruchom tę komórkę (`Shift+Enter`). Instalacja potrwa 1-2 minuty.
 
-**Uwaga:** Colab może wyświetlić ostrzeżenie o restarcie sesji — kliknij **"Restart runtime"** jeśli się pojawi, a potem uruchom komórkę instalacyjną ponownie.
+> **Uwaga:** Colab może wyświetlić ostrzeżenie o restarcie sesji — kliknij **"Restart runtime"** jeśli się pojawi, a potem uruchom komórkę instalacyjną ponownie. Nie musisz uruchamiać jej powtórnie — pakiety zostały już zainstalowane.
 
 
 ## Krok 4: Wgranie plików pomocniczych
