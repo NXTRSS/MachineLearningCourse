@@ -37,6 +37,7 @@ NOTEBOOKI = [
     "Sieć_Neuronowa.ipynb",
     "Model_Języka_polskie_nazwy_miast.ipynb",
     "Function_Calling.ipynb",
+    "RAG_warsztat.ipynb",
 ]
 
 
