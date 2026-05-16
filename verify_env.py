@@ -4,9 +4,9 @@ import shutil
 from importlib.metadata import version, PackageNotFoundError
 from packaging.version import Version
 
-# Minimalne wersje — muszą być spójne z pyproject.toml
+# Minimalne wersje — Intel Mac build (TF <2.17, brak wheels od 2.17+)
 required_packages = {
-    "tensorflow": "2.20",
+    "tensorflow": "2.15",
     "pillow": "9.4.0",
     "pandas": "2.2.3",
     "scikit-learn": "1.6.0",
