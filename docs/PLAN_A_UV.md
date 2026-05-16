@@ -97,7 +97,7 @@ uv sync
 ```
 
 To **jedyna komenda** — `uv` automatycznie:
-- Pobierze i zainstaluje Python 3.9 (jeśli go nie masz)
+- Pobierze i zainstaluje Python 3.11 (jeśli go nie masz)
 - Stworzy wirtualne środowisko (`.venv`)
 - Zainstaluje wszystkie wymagane pakiety (TensorFlow, Pandas, JupyterLab, itd.)
 
@@ -169,8 +169,9 @@ sudo apt-get install graphviz
 ### "uv: command not found"
 Zamknij i otwórz ponownie terminal po instalacji uv. Jeśli dalej nie działa, dodaj uv do PATH ręcznie — instalator powinien był wypisać ścieżkę.
 
-### TensorFlow nie instaluje się na M1/M2/M3 Mac
-TensorFlow 2.16+ ma pełne wsparcie dla Apple Silicon. Jeśli są problemy, spróbuj:
+### Intel Mac — TensorFlow
+Ten branch używa TensorFlow 2.16.2 (ostatnia wersja z wheels na Intel Mac).
+Jeśli są problemy, spróbuj:
 ```bash
 uv sync --reinstall
 ```
