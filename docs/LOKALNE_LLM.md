@@ -9,9 +9,9 @@ Na zajęciach z Function Calling i RAG używamy modeli językowych uruchomionych
 | RAM | Co możesz uruchomić |
 |-----|---------------------|
 | < 8 GB | Za mało — skorzystaj z serwera prowadzącego na zajęciach |
-| 8 GB | Małe modele: `qwen3:4b` ⭐, `gemma3:4b`, `phi4-mini` |
-| 16 GB | Komfortowe modele: `qwen3:8b` ⭐, `llama3.1:8b`, `gemma3:12b` |
-| 32 GB+ | Duże modele: `qwen3:14b`, `gemma3:27b`, `llama3.1:70b` (skwantyzowany) |
+| 8 GB | Małe modele: `gemma4:e4b` ⭐, `qwen3.5:4b`, `phi4-mini` |
+| 16 GB | Komfortowe modele: `qwen3.5:9b` ⭐, `gemma4:12b`, `qwen3:8b` |
+| 32 GB+ | Duże modele: `qwen3.6:27b`, `qwen3.6:35b-a3b`, `qwen3.5:27b` |
 
 > **Mac z Apple Silicon (M1/M2/M3/M4)** — GPU jest zintegrowany z CPU, więc cały RAM jest dostępny dla modelu. Laptop z 16 GB M2 pobije wiele desktopów z kartą 8 GB VRAM.
 
@@ -24,6 +24,8 @@ Otwórz **`setup_local_llm.ipynb`** — sprawdzi Twój sprzęt i przeprowadzi pr
 ---
 
 ## Platformy — LM Studio vs Ollama
+
+> **Nie wiesz co wybrać?** Zainstaluj **LM Studio** — ma graficzny interfejs, wbudowany chat i jednym kliknięciem uruchamia serwer API. Na Macu z Apple Silicon szukaj modeli w formacie MLX (zakładka MLX w wyszukiwarce).
 
 ### LM Studio ⭐ *polecana dla początkujących*
 
@@ -102,28 +104,49 @@ W LM Studio: przy wyszukiwaniu modelu wybierz zakładkę **MLX** lub filtruj po 
 
 > Modele GGUF też działają na Macu, ale wolniej. Jeśli widzisz wersję MLX — wybierz ją.
 
-### Rekomendowane modele do zajęć
+### Model obowiązkowy na zajęcia: `gemma-4-e4b`
+
+Na zajęciach wszyscy pracujemy na tym samym modelu — dzięki temu wyniki są porównywalne, a prowadzący może szybko pomóc.
+
+**`Gemma 4 E4B`** (Google) — model MoE z zaledwie 4B aktywnych parametrów. Szybki, lekki (~5 GB), a jednocześnie świetny w function calling. Mieści się nawet na 8 GB RAM.
+
+**Jak pobrać w LM Studio:**
+1. Otwórz LM Studio → zakładka **Discover** (lupa)
+2. Wpisz `gemma 4 e4b`
+3. Na Macu wybierz wersję **MLX** (szybsza). Na Windows/Linux: **GGUF**
+4. Kliknij **Download**
+
+> Na Macu z Apple Silicon szukaj modeli od `mlx-community` lub `lmstudio-community` z tagiem MLX.
+
+### Dodatkowy model — do eksperymentów w domu
+
+Jeśli masz zapas RAM-u, pobierz **też** większy model i porównaj jakość odpowiedzi:
+
+**LM Studio (polecane)** — w wyszukiwarce modeli wpisz nazwę i wybierz zakładkę **MLX** (Mac) lub **GGUF** (Windows/Linux):
 
 | Model | Rozmiar | RAM | Jakość | Uwagi |
 |-------|---------|-----|--------|-------|
-| `qwen3:4b` | ~3 GB | 8 GB | ★★★★★ | ⭐ Najlepsza jakość w klasie 4B, polecany |
-| `gemma3:4b` | ~3 GB | 8 GB | ★★★★ | Dobra alternatywa dla Qwen3:4b |
-| `phi4-mini` | ~2.5 GB | 8 GB | ★★★★ | Lżejszy, szybszy, nieco słabszy |
-| `llama3.2:3b` | ~2 GB | 8 GB | ★★★☆ | Minimum, gdy brakuje miejsca |
-| `qwen3:8b` | ~5 GB | 16 GB | ★★★★★ | ⭐ Polecany dla 16 GB RAM |
-| `llama3.1:8b` | ~5 GB | 16 GB | ★★★★★ | Równie dobry, popularna alternatywa |
-| `gemma3:12b` | ~8 GB | 16 GB | ★★★★★ | Świetny jeśli masz zapas RAM |
-| `qwen3:14b` | ~9 GB | 32 GB | ★★★★★ | Bardzo mocny model dla entuzjastów |
+| `gemma4:e4b` | ~5 GB | 8 GB | ★★★★★ | ⭐ **Obowiązkowy na zajęcia** |
+| `qwen3.5:4b` | ~3 GB | 8 GB | ★★★★★ | Alternatywa gdy Gemma nie pasuje |
+| `qwen3.5:9b` | ~6 GB | 16 GB | ★★★★★ | ⭐ Polecany jako drugi model (16 GB) |
+| `gemma4:12b` | ~8 GB | 16 GB | ★★★★★ | Świetna jakość, szybki na Apple Silicon |
+| `qwen3.6:35b-a3b` | ~19 GB | 32 GB | ★★★★★ | MoE, tylko ~3B aktywne — szybki mimo rozmiaru |
+| `qwen3.6:27b` | ~15 GB | 32 GB | ★★★★★ | Dense, najwyższa jakość (wolniejszy) |
 
-> Na zajęciach używamy głównie modeli 8B — jeśli masz 16 GB RAM, pobierz `qwen3:8b` lub `llama3.1:8b`.
+> Na zajęciach pracujemy na `gemma4:e4b`. Większe modele pobierz do domu — porównanie wyników to świetne ćwiczenie!
 
-#### O rodzinie Qwen3
+**Ollama** — jeśli wolisz terminal, te same modele dostępne przez `ollama run <nazwa>`.
 
-Qwen3 (Alibaba, 2025) to aktualnie jedna z najsilniejszych rodzin otwartych modeli. Kilka ciekawych cech:
-- **Tryb myślenia** — model może "myśleć na głos" (jak chain-of-thought) zanim odpowie; można to wyłączyć dodając `/no_think` w prompcie, gdy zależy Ci na szybkości
-- **128K kontekst** — znacznie więcej niż starsze modele (zwykle 4–8K)
+#### O modelach Gemma 4 i Qwen 3.5/3.6
+
+**Gemma 4** (Google, 2025) — rodzina MoE: `e4b` = 4B aktywnych parametrów (szybki!), `e2b` = 2B. Świetne function calling, natywny tryb myślenia.
+
+**Qwen 3.5 / 3.6** (Alibaba, 2025–2026) — jedne z najsilniejszych otwartych modeli:
+- **Tryb myślenia** — model "myśli na głos" (chain-of-thought) zanim odpowie
+- **128–256K kontekst** — znacznie więcej niż starsze modele
 - **119 języków** — w tym polski
-- Dostępny na Ollama (`qwen3:4b`, `qwen3:8b` itd.) i w MLX na Apple Silicon
+- Qwen 3.6 to najnowsza wersja z lepszym function calling i tool use
+- Dostępne w LM Studio (MLX/GGUF) i Ollama
 
 ---
 
@@ -152,10 +175,18 @@ Upewnij się że masz zainstalowane [Visual C++ Redistributable](https://aka.ms/
 
 ## Podsumowanie — co wybrać?
 
-- **Nie lubisz terminala** → LM Studio
-- **Mac z Apple Silicon** → LM Studio (MLX) lub Ollama
+- **Nie lubisz terminala** → LM Studio ⭐
+- **Mac z Apple Silicon** → LM Studio (MLX) — znacznie szybsze niż GGUF
 - **Chcesz automatyzować / skryptować** → Ollama
-- **Mało RAM (8 GB)** → `qwen3:4b` w LM Studio lub Ollama
-- **Dużo RAM (16 GB+)** → `qwen3:8b` lub `llama3.1:8b` w Ollamie lub LM Studio
+- **Mało RAM (8 GB)** → `gemma4:e4b` lub `qwen3.5:4b` w LM Studio
+- **Dużo RAM (16 GB+)** → `qwen3.5:9b` lub `gemma4:12b` w LM Studio
 
 Na zajęciach serwer prowadzącego jest zawsze dostępny jako backup — nie musisz mieć lokalnego modelu, żeby uczestniczyć w zajęciach.
+
+---
+
+## Docker (Plan B) — ważna uwaga
+
+Jeśli korzystasz z Dockera (Plan B), zainstaluj LM Studio / Ollamę **na swoim komputerze**, nie w kontenerze Docker. Notebook automatycznie wykryje LLM na hoście.
+
+> **Dlaczego nie w Dockerze?** Na Macu z Apple Silicon Docker nie ma dostępu do GPU — model działałby 10-15x wolniej. Na Windowsie/Linuksie z kartą NVIDIA jest to możliwe, ale niepotrzebnie komplikuje konfigurację.
