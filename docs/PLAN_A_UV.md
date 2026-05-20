@@ -97,7 +97,7 @@ uv sync
 ```
 
 To **jedyna komenda** — `uv` automatycznie:
-- Pobierze i zainstaluje Python 3.9 (jeśli go nie masz)
+- Pobierze i zainstaluje Python 3.11 (jeśli go nie masz)
 - Stworzy wirtualne środowisko (`.venv`)
 - Zainstaluje wszystkie wymagane pakiety (TensorFlow, Pandas, JupyterLab, itd.)
 
