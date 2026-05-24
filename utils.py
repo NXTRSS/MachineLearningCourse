@@ -649,17 +649,23 @@ def pick_best_model(available_models, preferred=None):
     available_lower = [a.lower() for a in available_models]
 
     # Przebieg 1: dokładny match z tagiem (Ollama ":" → LM Studio "-")
+    # Normalizacja bez kresek: "gemma4-e4b" pasuje do "gemma-4-e4b-it-mlx-4bit"
     for p in preferred:
         p_tag = p.replace(":", "-").lower()  # "qwen3.6:35b-a3b" → "qwen3.6-35b-a3b"
+        p_tag_norm = p_tag.replace("-", "")  # "gemma4-e4b" → "gemma4e4b"
         for i, a in enumerate(available_lower):
-            if p_tag in a or p.lower() == a:
+            a_norm = a.replace("-", "")
+            if p_tag in a or p.lower() == a or p_tag_norm in a_norm:
                 return available_models[i]
 
     # Przebieg 2: match po rodzinie (fallback gdy brak dokładnego)
+    # Normalizacja: "gemma4" pasuje do "gemma-4-..." (LM Studio dodaje kreskę)
     for p in preferred:
         pname = p.split(":")[0].lower()
+        pname_norm = pname.replace("-", "")
         for i, a in enumerate(available_lower):
-            if pname in a:
+            a_norm = a.replace("-", "")
+            if pname in a or pname_norm in a_norm:
                 return available_models[i]
 
     return available_models[0] if available_models else None
@@ -736,7 +742,10 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
             match = next((m for m in models if model.lower() in m.lower()), None)
             if match:
                 return match
-            print(f"  ⚠️ Nie znaleziono '{model}' — wybieram automatycznie")
+            print(f"  ⚠️ Nie znaleziono '{model}' wśród dostępnych modeli:")
+            for m in models:
+                print(f"       • {m}")
+            print(f"     Wybieram automatycznie z listy preferowanych...")
         return pick_best_model(models) or models[0]
 
     # ── Helpery do prób poszczególnych backendów ─────────────────────
