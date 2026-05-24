@@ -609,10 +609,18 @@ def detect_lmstudio(base_url="http://localhost:1234", api_key=None):
         r = requests.get(f"{base_url}/api/v1/models", timeout=3, headers=headers)
         if r.status_code == 200:
             models = r.json().get("models", [])
-            return [m["key"] for m in models if m.get("type") == "llm"]
+            llms = [m for m in models if m.get("type") == "llm"]
+            # Preferuj załadowane modele (nowsze wersje LM Studio mają pole "state")
+            loaded = [m["key"] for m in llms if m.get("state") == "loaded"]
+            if loaded:
+                return loaded
+            # Starsze wersje bez pola state — zwróć wszystkie LLM-y
+            if llms:
+                return [m["key"] for m in llms]
     except Exception:
         pass
     # Fallback: standardowy OpenAI endpoint (proxy, vLLM, itp.)
+    # /v1/models zwykle zwraca tylko aktywne/załadowane modele
     try:
         r = requests.get(f"{base_url}/v1/models", timeout=3, headers=headers)
         if r.status_code == 200:
@@ -648,17 +656,23 @@ def pick_best_model(available_models, preferred=None):
     available_lower = [a.lower() for a in available_models]
 
     # Przebieg 1: dokładny match z tagiem (Ollama ":" → LM Studio "-")
+    # Normalizacja bez kresek: "gemma4-e4b" pasuje do "gemma-4-e4b-it-mlx-4bit"
     for p in preferred:
         p_tag = p.replace(":", "-").lower()  # "qwen3.6:35b-a3b" → "qwen3.6-35b-a3b"
+        p_tag_norm = p_tag.replace("-", "")  # "gemma4-e4b" → "gemma4e4b"
         for i, a in enumerate(available_lower):
-            if p_tag in a or p.lower() == a:
+            a_norm = a.replace("-", "")
+            if p_tag in a or p.lower() == a or p_tag_norm in a_norm:
                 return available_models[i]
 
     # Przebieg 2: match po rodzinie (fallback gdy brak dokładnego)
+    # Normalizacja: "gemma4" pasuje do "gemma-4-..." (LM Studio dodaje kreskę)
     for p in preferred:
         pname = p.split(":")[0].lower()
+        pname_norm = pname.replace("-", "")
         for i, a in enumerate(available_lower):
-            if pname in a:
+            a_norm = a.replace("-", "")
+            if pname in a or pname_norm in a_norm:
                 return available_models[i]
 
     return available_models[0] if available_models else None
@@ -735,8 +749,33 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
             match = next((m for m in models if model.lower() in m.lower()), None)
             if match:
                 return match
-            print(f"  ⚠️ Nie znaleziono '{model}' — wybieram automatycznie")
+            print(f"  ⚠️ Nie znaleziono '{model}' wśród dostępnych modeli:")
+            for m in models:
+                print(f"       • {m}")
+            print(f"     Wybieram automatycznie z listy preferowanych...")
         return pick_best_model(models) or models[0]
+
+    def _verify(result):
+        """Smoke test — sprawdź czy wybrany model faktycznie odpowiada."""
+        if not result or result[0] is None:
+            return result
+        client, instr, name = result
+        try:
+            resp = client.chat.completions.create(
+                model=name,
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=1,
+                timeout=15.0,
+            )
+            actual = getattr(resp, 'model', '') or ''
+            if actual and name.lower() not in actual.lower() and actual.lower() not in name.lower():
+                print(f"  ⚠️ Żądano modelu '{name}', ale serwer używa '{actual}'!")
+                print(f"     Zmieniam MODEL_NAME na faktyczny: {actual}")
+                return client, instr, actual
+        except Exception as e:
+            print(f"  ⚠️ Model '{name}' nie odpowiedział na smoke test: {e}")
+            print(f"     Sprawdź czy model jest załadowany (LM Studio → kliknij model → Load).")
+        return result
 
     # ── Helpery do prób poszczególnych backendów ─────────────────────
     lms_ports = [1234]
@@ -815,24 +854,24 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
                 continue
             result = fn()
             if result:
-                return result
+                return _verify(result)
             print(f"  ✗ {b} — nie znaleziono")
         return None, None, None
 
     # ── Auto-detect (backend=None): LM Studio → Ollama → serwer ──────
     result = _try_lmstudio()
     if result:
-        return result
+        return _verify(result)
 
     print("  LM Studio niedostępne.")
     result = _try_ollama()
     if result:
-        return result
+        return _verify(result)
 
     print("  Lokalny LLM niedostępny.")
     result = _try_lecturer()
     if result:
-        return result
+        return _verify(result)
 
     print("✗ Brak dostępnego LLM-a! Zainstaluj LM Studio lub Ollamę (setup_local_llm.ipynb).")
     if _is_docker():
