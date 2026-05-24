@@ -22,6 +22,9 @@ logs/
 .vscode/
 .idea/
 
+# Lokalne notatki prowadzącego (tylko lokalnie, poza repo)
+TODO_LOCAL.md
+
 # Wewnętrzne notatki i narzędzia prowadzącego (nie dla studentów)
 CLAUDE.md
 CLAUDE_NOTEBOOK_KONWENCJE.md
