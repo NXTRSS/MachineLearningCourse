@@ -972,11 +972,14 @@ def ensure_package(pip_name, import_name=None):
     if shutil.which("uv"):
         try:
             subprocess.check_call(
-                ["uv", "pip", "install", "--quiet", pip_name],
+                ["uv", "pip", "install", "--quiet",
+                 "--python", sys.executable, pip_name],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
+            __import__(import_name)
             return
-        except (subprocess.CalledProcessError, FileNotFoundError):
+        except (subprocess.CalledProcessError, FileNotFoundError,
+                ImportError):
             pass
 
     # 2) python -m pip — Docker, Colab, zwykły venv
