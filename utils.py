@@ -746,7 +746,15 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
     def _pick(models):
         """Wybiera model: najpierw override (partial match), potem auto."""
         if model:
-            match = next((m for m in models if model.lower() in m.lower()), None)
+            model_lower = model.lower()
+            # Normalizacja: "gemma-4-e4b" == "gemma4:e4b" po usunięciu kresek i dwukropków
+            model_norm = model_lower.replace("-", "").replace(":", "")
+            match = next(
+                (m for m in models
+                 if model_lower in m.lower()
+                 or model_norm in m.lower().replace("-", "").replace(":", "")),
+                None,
+            )
             if match:
                 return match
             print(f"  ⚠️ Nie znaleziono '{model}' wśród dostępnych modeli:")
