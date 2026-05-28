@@ -42,3 +42,7 @@ search_gridsearch_log.txt
 bayesian_search.py
 bayesian_results.json
 .venv_dev/
+
+# Proxy serwera i sekrety (lokalne, nie dla repo)
+llm_proxy.py
+.env
