@@ -30,6 +30,8 @@ CLAUDE.md
 CLAUDE_NOTEBOOK_KONWENCJE.md
 STUBY_RESETOWANIE.md
 przed_zajeciami.py
+_test_przed_zajeciami.py
+_verify_przed_zajeciami.py
 _build_fc_notebook.py
 oznacz_stub.py
 wyczysc_logi.py
