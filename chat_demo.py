@@ -308,7 +308,9 @@ tools_definition.append(
 # ── 4. Wikipedia ──────────────────────────────────────────────────────
 
 import wikipedia
+import wikipedia.wikipedia as _wiki_module
 wikipedia.set_lang("pl")
+_wiki_module.USER_AGENT = "ALK-MachineLearning-Course/1.0 (https://github.com/NXTRSS/MachineLearningCourse) python-wikipedia/1.4.0"
 
 
 def search_wikipedia(query: str) -> str:
