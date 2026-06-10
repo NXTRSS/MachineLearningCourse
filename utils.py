@@ -781,8 +781,12 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
                 print(f"     Zmieniam MODEL_NAME na faktyczny: {actual}")
                 return client, instr, actual
         except Exception as e:
-            print(f"  ⚠️ Model '{name}' nie odpowiedział na smoke test: {e}")
-            print(f"     Sprawdź czy model jest załadowany (LM Studio → kliknij model → Load).")
+            err_str = str(e)
+            if "401" in err_str or "403" in err_str:
+                print(f"  ℹ️  Serwer wymaga auth — smoke test pominięty (setup_auth_client poprosi o hasło).")
+            else:
+                print(f"  ⚠️ Model '{name}' nie odpowiedział na smoke test: {e}")
+                print(f"     Sprawdź czy model jest załadowany (LM Studio → kliknij model → Load).")
         return result
 
     # ── Helpery do prób poszczególnych backendów ─────────────────────
