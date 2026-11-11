@@ -1,10 +1,16 @@
+import os
+# transformers/sentence-transformers przy zainstalowanym TensorFlow + Keras 3 padają
+# ("Keras 3 ... not yet supported in Transformers"). USE_TF=0 każe im używać tylko PyTorcha.
+# Musi być ustawione PRZED pierwszym importem transformers (TRANSFORMERS_NO_TF nie działa).
+os.environ.setdefault("USE_TF", "0")
+
 import pandas as pd
 from ipywidgets import widgets
 from IPython.display import display
 import numpy as np
 from PIL import Image
-import urllib
-import os
+import urllib.request
+import urllib.error
 import matplotlib.pyplot as plt
 import io
 
@@ -252,17 +258,23 @@ def predict_image_from_urls(models, urls, classNames):
 
     for photo_url, axis in zip(urls, axes):
         req = urllib.request.Request(photo_url, headers={'User-Agent': 'Mozilla/5.0'})
-        for _attempt in range(3):
-            try:
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    img_bytes = response.read()
-                break
-            except urllib.error.HTTPError as e:
-                if e.code in (429, 502, 503, 504) and _attempt < 2:
-                    import time; time.sleep(2 * (_attempt + 1))
-                else:
-                    raise
-        image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        try:
+            for _attempt in range(3):
+                try:
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        img_bytes = response.read()
+                    break
+                except urllib.error.HTTPError as e:
+                    if e.code in (429, 502, 503, 504) and _attempt < 2:
+                        import time; time.sleep(2 * (_attempt + 1))
+                    else:
+                        raise
+            image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        except Exception as e:
+            # Jeden niedziałający URL (403/404/timeout) nie kasuje całego wykresu
+            axis.axis('off')
+            axis.set_title(f"Nie udało się pobrać:\n{photo_url[:60]}\n({e})", fontsize=10)
+            continue
         axis.imshow(image)
         axis.axis('off')
         axis.set_title(_build_title(models_dict, image, classNames), fontsize=12)
@@ -499,7 +511,8 @@ def display_generated_city(prompt, real_cities=None):
     """
     from IPython.display import display, Markdown
     name = prompt[1:-1]  # bez tokenów % i !
-    msg = f"## 🏘️ **Wygenerowana nazwa miasta:** `{name.title()}`"
+    # Bez .title() — model ma sam nauczyć się kapitalizacji (tokenizer z lower=False)
+    msg = f"## 🏘️ **Wygenerowana nazwa miasta:** `{name}`"
     if real_cities is not None:
         if name in real_cities:
             msg += "\n\n⚠️ Ta nazwa **istnieje** w zbiorze treningowym (model ją skopiował)"
@@ -572,13 +585,15 @@ def visualize_probabilities(probabilities, step, tokenizer, prompt, chosen_idx, 
 # ─────────────────────────── LLM auto-detect ────────────────────────────
 
 PREFERRED_MODELS = [
-    # Od najsilniejszego do najsłabszego; MoE przed dense w tej samej rodzinie
+    # Model kursowy (standard zajęć) zawsze pierwszy — wszyscy pracują na tym samym
+    "gemma4:e4b",
+    # Dalej od najsilniejszego do najsłabszego; MoE przed dense w tej samej rodzinie
     "qwen3.6:35b-a3b", "qwen3.6:27b",
     "qwen3.5:27b", "qwen3.5:9b", "qwen3.5:4b",
     "qwen3:14b", "qwen3:8b",
-    "gemma4:12b", "gemma4:4b",
-    "gemma4:e4b", "gemma4:e2b",
-    "gemma3:27b", "gemma3:12b", "gemma3:8b",
+    "gemma4:12b",
+    "gemma4:e2b",
+    "gemma3:27b", "gemma3:12b",
     "qwen2.5:14b", "qwen2.5:7b",
     "gemma2:9b", "mistral:7b", "llama3.1:8b",
     "qwen3.5:2b", "qwen3.5:0.8b",
@@ -604,29 +619,38 @@ def detect_lmstudio(base_url="http://localhost:1234", api_key=None):
     headers = {}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    # Natywny endpoint LM Studio
+    # Natywny endpoint LM Studio >= 0.4: {"models": [{"key", "type", "loaded_instances", ...}]}
     try:
         r = requests.get(f"{base_url}/api/v1/models", timeout=3, headers=headers)
         if r.status_code == 200:
             models = r.json().get("models", [])
             llms = [m for m in models if m.get("type") == "llm"]
-            # Preferuj załadowane modele (nowsze wersje LM Studio mają pole "state")
-            loaded = [m["key"] for m in llms if m.get("state") == "loaded"]
-            if loaded:
-                return loaded
-            # Starsze wersje bez pola state — zwróć wszystkie LLM-y
-            if llms:
-                return [m["key"] for m in llms]
+            # Preferuj załadowane modele (niepusta lista loaded_instances)
+            loaded = [m["key"] for m in llms if m.get("loaded_instances")]
+            if loaded or llms:
+                return loaded or [m["key"] for m in llms]
+    except Exception:
+        pass
+    # Starszy endpoint LM Studio 0.3.6–0.3.x: {"data": [{"id", "type", "state", ...}]}
+    try:
+        r = requests.get(f"{base_url}/api/v0/models", timeout=3, headers=headers)
+        if r.status_code == 200:
+            models = r.json().get("data", [])
+            llms = [m for m in models if m.get("type") in ("llm", "vlm")]
+            loaded = [m["id"] for m in llms if m.get("state") == "loaded"]
+            if loaded or llms:
+                return loaded or [m["id"] for m in llms]
     except Exception:
         pass
     # Fallback: standardowy OpenAI endpoint (proxy, vLLM, itp.)
-    # /v1/models zwykle zwraca tylko aktywne/załadowane modele
+    # Przy JIT LM Studio listuje tu WSZYSTKIE pobrane modele — odfiltruj embeddingi
     try:
         r = requests.get(f"{base_url}/v1/models", timeout=3, headers=headers)
         if r.status_code == 200:
             data = r.json().get("data", [])
-            if data:
-                return [m["id"] for m in data]
+            ids = [m["id"] for m in data if "embed" not in m["id"].lower()]
+            if ids:
+                return ids
     except Exception:
         pass
     return []
@@ -722,19 +746,12 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
         """Tworzy oba klienty: zwykły + instructor."""
         key = api_key or default_key  # jawny api_key ma priorytet
 
-        # Docker → host.docker.internal = LLM prowadzącego, nie swój
-        # Pytamy o imię żeby prowadzący widział kto się łączy
-        headers = {}
-        is_remote_host = "host.docker.internal" in base_url
-        if is_remote_host:
-            student_name = input("👤 Twoje imię: ").strip() or "Anonim"
-            headers["X-Student-Name"] = student_name
-            print(f"  Łączę jako: {student_name}")
-
+        # Docker → host.docker.internal to WŁASNE LM Studio/Ollama studenta na hoście
+        # (traktujemy jak localhost). O imię i hasło do serwera prowadzącego
+        # pyta dopiero setup_auth_client.
         client = OpenAI(
             base_url=f"{base_url}/v1",
             api_key=key,
-            default_headers=headers or None,
         )
         try:
             import instructor
@@ -773,7 +790,7 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
                 model=name,
                 messages=[{"role": "user", "content": "test"}],
                 max_tokens=1,
-                timeout=15.0,
+                timeout=60.0,  # pierwsze ładowanie modelu (JIT w LM Studio) trwa kilkadziesiąt sekund
             )
             actual = getattr(resp, 'model', '') or ''
             if actual and name.lower() not in actual.lower() and actual.lower() not in name.lower():
@@ -781,8 +798,15 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
                 print(f"     Zmieniam MODEL_NAME na faktyczny: {actual}")
                 return client, instr, actual
         except Exception as e:
-            print(f"  ⚠️ Model '{name}' nie odpowiedział na smoke test: {e}")
-            print(f"     Sprawdź czy model jest załadowany (LM Studio → kliknij model → Load).")
+            err_str = str(e)
+            if "401" in err_str or "403" in err_str:
+                print(f"  ℹ️  Serwer wymaga auth — smoke test pominięty (setup_auth_client poprosi o hasło).")
+            elif "400" in err_str and ("imienia" in err_str or "X-Student-Name" in err_str):
+                print(f"  ℹ️  Serwer prowadzącego wymaga imienia — setup_auth_client zapyta o nie.")
+            else:
+                print(f"  ⚠️ Model '{name}' nie odpowiedział na smoke test: {e}")
+                print(f"     Model może się właśnie ładować — odczekaj chwilę i uruchom komórkę ponownie.")
+                print(f"     Sprawdź czy model jest załadowany (LM Studio → kliknij model → Load).")
         return result
 
     # ── Helpery do prób poszczególnych backendów ─────────────────────
@@ -888,6 +912,28 @@ def connect_llm(lecturer_server="http://ADRES_SERWERA:PORT", model=None, api_key
     return None, None, None
 
 
+def encode_student_name(name):
+    """Imię do nagłówka X-Student-Name.
+
+    Nagłówki HTTP (httpx/OpenAI SDK) przyjmują tylko ASCII, więc „Łukasz Żółć”
+    rzuciłoby UnicodeEncodeError. Kodujemy procentowo; llm_proxy odkodowuje.
+    """
+    from urllib.parse import quote
+    return quote((name or "").strip() or "Anonim", safe=" -_.")
+
+
+def _server_error_message(exc):
+    """Wyciągnij czytelny komunikat z błędu serwera (format OpenAI: {"error": {"message": ...}})."""
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        err = body.get("error", body)
+        if isinstance(err, dict) and err.get("message"):
+            return str(err["message"])
+        if isinstance(err, str):
+            return err
+    return ""
+
+
 def setup_auth_client(client, instructor_client, model_name):
     """Sprawdź czy serwer wymaga auth i poproś o dane studenta.
 
@@ -903,9 +949,16 @@ def setup_auth_client(client, instructor_client, model_name):
         return client, instructor_client
 
     base_url = str(getattr(client, "base_url", ""))
-    is_local = "localhost" in base_url or "127.0.0.1" in base_url
+    # host.docker.internal = własne LM Studio/Ollama studenta na hoście (Plan B Docker)
+    _LOCAL_HOSTS = ("localhost", "127.0.0.1", "host.docker.internal")
+    is_local = any(h in base_url for h in _LOCAL_HOSTS)
     if is_local:
         return client, instructor_client
+
+    # Hasło podane już w connect_llm(api_key=...) — nie pytaj drugi raz
+    existing_key = getattr(client, "api_key", None)
+    if existing_key in (None, "", "lm-studio", "ollama", "no-key"):
+        existing_key = None
 
     # ── Sonda: czy serwer wymaga hasła? ──
     import requests as _req
@@ -914,9 +967,13 @@ def setup_auth_client(client, instructor_client, model_name):
         probe = _req.post(
             f"{base_url.rstrip('/')}/chat/completions",
             json={"model": "test", "messages": []},
+            headers={"Authorization": f"Bearer {existing_key}"} if existing_key else None,
             timeout=3,
         )
-        needs_password = probe.status_code in (401, 403)
+        # 429 = proxy chwilowo zablokowało IP po nieudanych próbach → też wymaga hasła
+        needs_password = probe.status_code in (401, 403, 429)
+        if probe.status_code == 429:
+            print("⚠️ Serwer chwilowo blokuje Twoje IP po nieudanych próbach — odczekaj ok. minutę.")
     except Exception:
         pass
 
@@ -924,30 +981,45 @@ def setup_auth_client(client, instructor_client, model_name):
     from openai import OpenAI
 
     student_name = input("👤 Twoje imię: ").strip() or "Anonim"
+    # Nagłówki HTTP przyjmują tylko ASCII — „Łukasz” wysyłamy zakodowane (proxy to odkoduje)
+    name_header = encode_student_name(student_name)
 
-    if needs_password:
-        import getpass as _gp
-        student_key = _gp.getpass("🔑 Hasło (prowadzący poda na zajęciach): ")
-    else:
-        student_key = None
-
-    new_client = OpenAI(
-        base_url=base_url,
-        api_key=student_key or "no-key",
-        default_headers={"X-Student-Name": student_name},
-    )
-
-    # Test połączenia
-    try:
-        new_client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": "test"}],
-            max_tokens=1,
+    student_key = existing_key
+    new_client = None
+    for attempt in range(3):
+        if needs_password and (attempt > 0 or not existing_key):
+            import getpass as _gp
+            student_key = _gp.getpass("🔑 Hasło (prowadzący poda na zajęciach): ").strip()
+        new_client = OpenAI(
+            base_url=base_url,
+            api_key=student_key or "no-key",
+            default_headers={"X-Student-Name": name_header},
         )
-        print(f"✅ Połączono z serwerem jako {student_name}")
-    except Exception as e:
-        print(f"❌ Błąd połączenia: {e}")
-        print("   Sprawdź hasło i spróbuj ponownie.")
+        # Test połączenia
+        try:
+            new_client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=1,
+            )
+            print(f"✅ Połączono z serwerem jako {student_name}")
+            break
+        except Exception as e:
+            status = getattr(e, "status_code", None)
+            msg = _server_error_message(e)
+            if status == 401:
+                needs_password = True
+                print(f"❌ {msg or 'Serwer odrzucił hasło.'}")
+                if attempt < 2:
+                    print("   Spróbuj jeszcze raz (wielkość liter ma znaczenie).")
+                    continue
+            elif status == 429:
+                print(f"❌ {msg or 'Zbyt wiele nieudanych prób — odczekaj minutę.'}")
+            else:
+                print(f"❌ Błąd połączenia: {msg or e}")
+                print("   Sprawdź adres serwera i sieć Wi-Fi.")
+            return None, None
+    else:
         return None, None
 
     try:
@@ -961,48 +1033,91 @@ def setup_auth_client(client, instructor_client, model_name):
 
 # ─────────────────────────── ensure_package ───────────────────────────
 
+# Domyślne ograniczenia wersji dla pakietów instalowanych "na żądanie".
+# nowsze gradio 6.x ciągną huggingface-hub>=1.0, a transformers 4.x (sentence-transformers
+# w RAG) wymaga huggingface-hub<1.0 → po Function Calling RAG przestałby działać.
+_DEFAULT_PINS = {          # używane, gdy wywołanie nie podaje własnej wersji
+    "gradio": "gradio>=6,<7",  # + huggingface-hub<1.0 → resolver bierze ostatnie zgodne 6.x (dziś 6.17.3)
+}
+_EXTRA_CONSTRAINTS = {     # dokładane zawsze do instalacji danego pakietu
+    "gradio": ["huggingface-hub<1.0"],
+}
+
+
 def ensure_package(pip_name, import_name=None):
     """Sprawdź czy pakiet jest dostępny; jeśli nie — zainstaluj.
 
     Działa z uv (Plan A), Docker/pip (Plan B) i Google Colab (Plan C).
+
+    pip_name może zawierać specyfikator wersji, np. ensure_package("gradio>=6,<7", "gradio").
+    Wersja jest brana pod uwagę tylko przy instalacji (już zainstalowany pakiet
+    nie jest podmieniany).
     """
-    import subprocess, sys, shutil
-    import_name = import_name or pip_name
+    import subprocess, sys, shutil, importlib, re
+    base_name = re.split(r"[<>=!~\[;\s]", pip_name.strip(), maxsplit=1)[0]
+    import_name = import_name or base_name
     try:
         __import__(import_name)
         return
     except ImportError:
         pass
 
-    print(f"Instaluję {pip_name}...")
+    # Bez jawnej wersji → użyj bezpiecznych ograniczeń z _DEFAULT_PINS / _EXTRA_CONSTRAINTS
+    key = base_name.lower()
+    has_spec = pip_name.strip() != base_name
+    specs = [pip_name.strip() if has_spec else _DEFAULT_PINS.get(key, base_name)]
+    specs += _EXTRA_CONSTRAINTS.get(key, [])
+    print(f"Instaluję {' '.join(specs)}...")
+    errors = []
+
+    def _tail(proc):
+        lines = ((proc.stderr or "") + (proc.stdout or "")).strip().splitlines()
+        return "\n".join(lines[-10:])
 
     # 1) uv pip install — środowisko uv (Plan A)
-    if shutil.which("uv"):
+    #    JupyterLab uruchomiony spoza terminala (np. VS Code) może nie mieć uv w PATH
+    uv = shutil.which("uv")
+    if not uv:
+        for cand in (os.path.expanduser("~/.local/bin/uv"),
+                     os.path.expanduser("~/.local/bin/uv.exe"),
+                     os.path.expanduser("~/.cargo/bin/uv"),
+                     os.path.expanduser("~/.cargo/bin/uv.exe")):
+            if os.path.isfile(cand):
+                uv = cand
+                break
+    if uv:
         try:
-            subprocess.check_call(
-                ["uv", "pip", "install", "--quiet",
-                 "--python", sys.executable, pip_name],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            proc = subprocess.run(
+                [uv, "pip", "install", "--quiet", "--python", sys.executable, *specs],
+                capture_output=True, text=True,
             )
-            __import__(import_name)
-            return
-        except (subprocess.CalledProcessError, FileNotFoundError,
-                ImportError):
-            pass
+            if proc.returncode == 0:
+                importlib.invalidate_caches()
+                __import__(import_name)
+                return
+            errors.append(f"[uv] {_tail(proc)}")
+        except (FileNotFoundError, ImportError) as e:
+            errors.append(f"[uv] {e}")
 
     # 2) python -m pip — Docker, Colab, zwykły venv
     try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "-q", pip_name],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        proc = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", *specs],
+            capture_output=True, text=True,
         )
-        return
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+        if proc.returncode == 0:
+            importlib.invalidate_caches()
+            __import__(import_name)
+            return
+        errors.append(f"[pip] {_tail(proc)}")
+    except (FileNotFoundError, ImportError) as e:
+        errors.append(f"[pip] {e}")
 
+    quoted = " ".join(f'"{s}"' for s in specs)
     raise RuntimeError(
         f"Nie udało się zainstalować {pip_name}. "
-        f"Spróbuj ręcznie: uv pip install {pip_name}  lub  pip install {pip_name}"
+        f"Spróbuj ręcznie: uv pip install {quoted}  lub  pip install {quoted}\n"
+        + "\n".join(errors)
     )
 
 
@@ -1111,6 +1226,14 @@ class _TextExtractor(_HTMLParser):
         return text.strip()
 
 
+COURSE_USER_AGENT = (
+    "ALK-MachineLearning-Course/1.0 "
+    "(https://github.com/NXTRSS/MachineLearningCourse) "
+    "python-requests"
+)
+_FETCH_MAX_BYTES = 1 << 20  # 1 MB
+
+
 def fetch_webpage(url: str, max_chars: int = 3000) -> str:
     """
     Pobiera stronę internetową i zwraca jej treść jako czysty tekst (bez HTML).
@@ -1124,12 +1247,21 @@ def fetch_webpage(url: str, max_chars: int = 3000) -> str:
     import requests
     try:
         r = requests.get(
-            url, timeout=10,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; StudentBot/1.0)"},
+            url, timeout=10, stream=True,
+            # Opisowy User-Agent kursu (Wikimedia odrzuca generyczne UA → 403)
+            headers={"User-Agent": COURSE_USER_AGENT},
         )
         r.raise_for_status()
+        # Limit pobierania: najwyżej ~1 MB HTML-a (nie ściągamy 50 MB stron)
+        raw = b""
+        for chunk in r.iter_content(chunk_size=64 * 1024):
+            raw += chunk
+            if len(raw) >= _FETCH_MAX_BYTES:
+                break
+        r.close()
+        html = raw.decode(r.encoding or "utf-8", errors="replace")
         extractor = _TextExtractor()
-        extractor.feed(r.text)
+        extractor.feed(html)
         text = extractor.get_text()
         if not text:
             return f"Strona {url} nie zawiera czytelnego tekstu."

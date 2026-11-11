@@ -47,7 +47,7 @@ cd MachineLearningCourse
 ```
 
 > **Nie możesz zainstalować Gita?** Wejdź na https://github.com/NXTRSS/MachineLearningCourse → zielony przycisk **Code** → **Download ZIP**. Wypakuj i otwórz terminal w tym folderze.
-> ⚠️ Bez Gita nie będziesz mógł pobierać aktualizacji materiałów (`git pull`).
+> ⚠️ Bez Gita nie da się pobierać aktualizacji materiałów (`git pull`).
 
 
 ## Krok 5: Uruchomienie środowiska
@@ -85,6 +85,9 @@ python verify_env.py
 ```
 
 Jeśli zobaczysz `Environment verification: OK` — środowisko jest poprawnie skonfigurowane.
+Linie `INFO — brak` przy `tensorflow`, `gensim`, `spacy` itp. są w Planie B normalne: te pakiety instalują się same w notebookach, które ich potrzebują.
+
+> 💡 **Lokalny LLM w Planie B:** LM Studio / Ollamę uruchamiasz na swoim komputerze (nie w kontenerze) — notebook znajdzie je pod adresem `host.docker.internal`. Czat w przeglądarce z notebooka Function Calling (sekcja 14) otworzysz pod **http://localhost:7860**.
 
 
 ## Rozpoczęcie pracy na kolejny dzień
@@ -102,8 +105,10 @@ Przy każdym kolejnym uruchomieniu wystarczy:
 Aby zatrzymać środowisko: naciśnij `Ctrl+C` w terminalu, lub wpisz w innym terminalu:
 
 ```bash
-docker compose down
+docker compose stop
 ```
+
+> ⚠️ Nie używaj na co dzień `docker compose down` — usuwa kontener razem z pakietami doinstalowanymi w notebookach (np. TensorFlow), które przy następnym `up` instalują się od nowa.
 
 
 ## Rozwiązywanie problemów
@@ -114,7 +119,11 @@ Docker Desktop nie jest zainstalowany lub nie jest uruchomiony. Sprawdź czy wid
 ### "port 8888 already in use"
 Inny program (np. Jupyter) używa portu 8888. Zamknij go lub zmień port:
 ```bash
-docker compose up -e JUPYTER_PORT=8889
+JUPYTER_PORT=8889 docker compose up
+```
+Windows (PowerShell):
+```powershell
+$env:JUPYTER_PORT=8889; docker compose up
 ```
 Wtedy JupyterLab będzie na **http://localhost:8889**
 

@@ -45,7 +45,7 @@ def launch_chat(
         system_prompt: System prompt (np. DEFAULT_SYSTEM_PROMPT)
         instructor_client: Opcjonalny instructor client (do wymuszonego reasoning)
         max_steps: Maks. liczba kroków agenta na jedną wiadomość (domyślnie 6)
-        share: True = publiczny link (np. do pokazania na zajęciach przez ngrok)
+        share: True = publiczny link Gradio (ok. 72 h, dostęp ma każdy z linkiem — uważaj)
         auth_password: Hasło stałe — Gradio pokaże ekran logowania z hasłem.
         auth_fn: Funkcja (username, password) → nowy client lub False.
         ask_username: True = pokaż ekran z polem "Użytkownik" (bez hasła).
@@ -107,7 +107,9 @@ def launch_chat(
             import time as _time
 
             future_pool = ThreadPoolExecutor(max_workers=1)
-            _extra = {"X-Student-Name": _username[0]} if _username[0] else {}
+            # ASCII-only nagłówek: polskie znaki kodujemy procentowo (llm_proxy odkodowuje)
+            from urllib.parse import quote as _q
+            _extra = {"X-Student-Name": _q(_username[0], safe=" -_.")} if _username[0] else {}
             future = future_pool.submit(
                 _client[0].chat.completions.create,
                 model=model_name,
@@ -399,11 +401,23 @@ def launch_chat(
 
         clear_btn.click(lambda: [], None, full_history)
 
+    from utils import _is_docker
+    in_docker = _is_docker()
+
     print("\n🚀 Uruchamiam chat UI...")
-    print("   Otwieram w nowej karcie przeglądarki...\n")
+    if in_docker:
+        # W kontenerze przeglądarka się nie otworzy; port 7860 jest przekazany w docker-compose.yml
+        print("   Docker: otwórz w przeglądarce http://localhost:7860\n")
+    else:
+        print("   Otwieram w nowej karcie przeglądarki...\n")
+    if share:
+        print("⚠️  share=True publikuje ten czat pod publicznym linkiem (ok. 72 h) — każdy z linkiem")
+        print("   korzysta z Twojego połączenia z LLM (także z serwerem prowadzącego). Nie udostępniaj go.\n")
     demo.launch(
         share=share,
         quiet=False,
-        inbrowser=True,
+        inbrowser=not in_docker,
+        server_name="0.0.0.0" if in_docker else None,
+        server_port=7860 if in_docker else None,
         height=300,
     )
