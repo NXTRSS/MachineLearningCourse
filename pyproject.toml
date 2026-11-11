@@ -4,8 +4,10 @@ version = "1.0.0"
 description = "Zajęcia z Uczenia Maszynowego - Python Podyplomowe"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-    # TensorFlow — 2.20+ ma wheels na Python 3.11/3.12/3.13
-    "tensorflow>=2.20",
+    # TensorFlow — 2.20+ ma wheels na Python 3.11/3.12/3.13 (Windows, Linux, Mac Apple Silicon).
+    # Mac z procesorem Intel: ostatni wheel to 2.16.2 (Python <= 3.12, też Keras 3).
+    "tensorflow>=2.20; sys_platform != 'darwin' or platform_machine == 'arm64'",
+    "tensorflow==2.16.2; sys_platform == 'darwin' and platform_machine == 'x86_64' and python_version < '3.13'",
 
     # Podstawowe ML (minimalne wersje kompatybilne z Python 3.11–3.13)
     "pillow>=9.4.0",
@@ -41,4 +43,20 @@ dependencies = [
 
     # API
     "openai",
+    "requests",
+
+    # Pakiety instalowane w notebookach przez ensure_package() — w locku, żeby
+    # `uv sync` ich nie kasował i żeby resolver dobrał zgodne wersje.
+    "instructor",
+    "wikipedia",
+    "ddgs",
+    "tiktoken",
+    "tensorboard",
+    # nowsze gradio 6.x wymagają huggingface-hub>=1.0, a transformers 4.x (sentence-transformers) <1.0;
+    # razem z "huggingface-hub<1.0" resolver dobiera gradio 6.17.x
+    "gradio>=6,<7",
+    "huggingface-hub<1.0",
+    "beautifulsoup4",
+    "lxml",
+    "trafilatura",
 ]
