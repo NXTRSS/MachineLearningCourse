@@ -27,7 +27,12 @@ while read local_ref local_sha remote_ref remote_sha; do
 
     # -- Block commits from forbidden authors/committers --
     if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-        range="$local_sha"
+        merge_base=$(git merge-base origin/main "$local_sha" 2>/dev/null)
+        if [ -n "$merge_base" ]; then
+            range="$merge_base..$local_sha"
+        else
+            range="$local_sha"
+        fi
     else
         range="$remote_sha..$local_sha"
     fi
