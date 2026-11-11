@@ -6,12 +6,14 @@ Na zajęciach z Function Calling i RAG możesz użyć modelu językowego hostowa
 
 - Laptop w **tej samej sieci WiFi** co prowadzący
 - Środowisko uruchomione (Plan A lub B — patrz główne README)
-- Adres IP serwera podany przez prowadzącego (format: `http://192.168.X.X:1234`)
+- Adres serwera i hasło — poda prowadzący na zajęciach (format adresu: `http://ADRES:PORT`, np. `http://192.168.X.X:4242`)
+
+Przy łączeniu zostaniesz zapytany o **imię** (prowadzący widzi je na swoim ekranie, żeby wiedzieć, kto czeka na odpowiedź) i o **hasło** od prowadzącego.
 
 
 ## Szybki test połączenia
 
-Otwórz notebook **`test_polaczenia.ipynb`**, wpisz adres podany przez prowadzącego i uruchom obie komórki. Jeśli zobaczysz `✓ Połączenie OK!` — gotowe.
+Otwórz notebook **`test_polaczenia.ipynb`**, wpisz adres podany przez prowadzącego i uruchom komórkę (zapyta o imię i hasło). Jeśli zobaczysz `✓ Wszystko działa!` — gotowe.
 
 
 ## Najczęstsze problemy
@@ -22,7 +24,8 @@ Otwórz notebook **`test_polaczenia.ipynb`**, wpisz adres podany przez prowadzą
 
 Sprawdź czy Twój laptop jest w tej samej sieci co prowadzący. Twój adres IP:
 - Windows: `ipconfig` → szukaj `IPv4 Address`
-- macOS/Linux: `ipconfig getifaddr en0`
+- macOS: `ipconfig getifaddr en0`
+- Linux: `hostname -I`
 
 Adres powinien zaczynać się od tych samych trzech liczb co adres prowadzącego (np. oba `192.168.0.x`).
 
@@ -30,9 +33,19 @@ Adres powinien zaczynać się od tych samych trzech liczb co adres prowadzącego
 
 Adres serwera **zawsze** zaczyna się od `http://`, nigdy `https://`. To częsty błąd.
 
-**Przyczyna 3 — zły port**
+**Przyczyna 3 — literówka w adresie**
 
-Serwer prowadzącego działa na porcie `1234` (LM Studio), nie `11434` (Ollama). Upewnij się że adres kończy się `:1234`.
+Przepisz adres **dokładnie** tak, jak podał prowadzący — razem z portem po dwukropku (np. `:4242`).
+
+### „Nieprawidłowe hasło” / błąd 401 albo 429
+
+- **„Ten serwer wymaga hasła od prowadzącego”** — uruchom komórkę z `setup_auth_client` (albo `test_polaczenia.ipynb`) i wpisz hasło, gdy notebook o nie zapyta.
+- **„Nieprawidłowe hasło”** — wpisz je dokładnie tak, jak podał prowadzący (wielkość liter ma znaczenie). Notebook pozwala spróbować 3 razy, potem uruchom komórkę ponownie.
+- **„Zbyt wiele błędnych haseł”** (błąd 429) — po 5 błędnych próbach serwer blokuje Twój komputer na ok. minutę. Odczekaj i spróbuj z poprawnym hasłem.
+
+### „Brak imienia studenta” / błąd 400
+
+Serwer prowadzącego wymaga imienia (prowadzący widzi, kto czeka w kolejce). Uruchom ponownie komórkę z `setup_auth_client` — zapyta o imię. Polskie znaki w imieniu (np. „Łukasz”) są w porządku. Jeśli błąd się powtarza: `git pull` i **Kernel → Restart Kernel** (stary `utils.py` w pamięci kernela nie wysyła imienia).
 
 ---
 
@@ -60,7 +73,7 @@ curl http://...
 ```
 użyj:
 ```powershell
-Invoke-RestMethod -Uri "http://192.168.X.X:1234/v1/models"
+Invoke-RestMethod -Uri "http://192.168.X.X:4242/v1/models"
 ```
 
 ---
@@ -74,12 +87,12 @@ Jeden serwer obsługuje całą grupę — przy wielu równoczesnych zapytaniach 
 
 macOS/Linux:
 ```bash
-curl http://<adres-prowadzącego>:1234/v1/models
+curl http://<adres-prowadzącego>:<port>/v1/models
 ```
 
 Windows (PowerShell):
 ```powershell
-Invoke-RestMethod -Uri "http://<adres-prowadzącego>:1234/v1/models"
+Invoke-RestMethod -Uri "http://<adres-prowadzącego>:<port>/v1/models"
 ```
 
 Jeśli serwer działa, dostaniesz odpowiedź JSON z nazwą modelu.
