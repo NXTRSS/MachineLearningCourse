@@ -13,5 +13,18 @@ matplotlib>=3.9.2
 ipywidgets>=8.1.2
 ipykernel
 packaging
-openai
+openai>=1
 requests
+# Lekkie pakiety warsztatów LLM (Function Calling, agenci web) — w obrazie,
+# żeby nie instalować ich na zajęciach przez ensure_package()
+instructor
+wikipedia
+ddgs
+tiktoken
+beautifulsoup4
+lxml
+trafilatura
+# nowsze gradio 6.x wymagają huggingface-hub>=1.0, a transformers 4.x (sentence-transformers) <1.0;
+# razem z huggingface-hub<1.0 resolver dobiera gradio 6.17.x
+gradio>=6,<7
+huggingface-hub<1.0
