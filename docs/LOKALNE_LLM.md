@@ -63,7 +63,7 @@ Otwórz **`setup_local_llm.ipynb`** — sprawdzi Twój sprzęt i przeprowadzi pr
 - Open source
 
 **Wady:**
-- Brak interfejsu graficznego (tylko terminal)
+- Prosty interfejs graficzny (okno czatu), większość ustawień nadal przez terminal
 - Mniej przejrzysta informacja o obciążeniu sprzętu
 - Modele są w formacie GGUF — mniej wyboru niż na Hugging Face
 
@@ -108,7 +108,7 @@ W LM Studio: przy wyszukiwaniu modelu wybierz zakładkę **MLX** lub filtruj po 
 
 Na zajęciach wszyscy pracujemy na tym samym modelu — dzięki temu wyniki są porównywalne, a prowadzący może szybko pomóc.
 
-**`Gemma 4 E4B`** (Google) — model MoE z zaledwie 4B aktywnych parametrów. Szybki, lekki (~5 GB), a jednocześnie świetny w function calling. Mieści się nawet na 8 GB RAM.
+**`Gemma 4 E4B`** (Google) — model z ok. 4,5 mld *efektywnych* parametrów („E” = effective; ok. 8 mld razem z warstwami embeddingów). Szybki, lekki (~5 GB), a jednocześnie świetny w function calling. Mieści się nawet na 8 GB RAM.
 
 **Jak pobrać w LM Studio:**
 1. Otwórz LM Studio → zakładka **Discover** (lupa)
@@ -139,12 +139,12 @@ Jeśli masz zapas RAM-u, pobierz **też** większy model i porównaj jakość od
 
 #### O modelach Gemma 4 i Qwen 3.5/3.6
 
-**Gemma 4** (Google, 2025) — rodzina MoE: `e4b` = 4B aktywnych parametrów (szybki!), `e2b` = 2B. Świetne function calling, natywny tryb myślenia.
+**Gemma 4** (Google, 2026) — rodzina E2B, E4B, 12B, 26B A4B i 31B. `e4b`/`e2b` to małe modele dense z „efektywnymi” 4B/2B parametrów (Per-Layer Embeddings) — szybkie! Jedynym MoE w rodzinie jest 26B A4B. Świetne function calling, natywny tryb myślenia.
 
 **Qwen 3.5 / 3.6** (Alibaba, 2025–2026) — jedne z najsilniejszych otwartych modeli:
 - **Tryb myślenia** — model "myśli na głos" (chain-of-thought) zanim odpowie
 - **128–256K kontekst** — znacznie więcej niż starsze modele
-- **119 języków** — w tym polski
+- **Ponad 100 języków** — w tym polski
 - Qwen 3.6 to najnowsza wersja z lepszym function calling i tool use
 - Dostępne w LM Studio (MLX/GGUF) i Ollama
 
@@ -154,16 +154,19 @@ Jeśli masz zapas RAM-u, pobierz **też** większy model i porównaj jakość od
 
 ### Model działa bardzo wolno
 Sprawdź czy aplikacja używa GPU:
-- **LM Studio:** na dole okna widać `GPU Layers` — powinno być > 0
+- **LM Studio:** w ustawieniach ładowania modelu sprawdź `GPU Offload` / `GPU Layers` (zależnie od wersji) — powinno być > 0
 - **Ollama:** `ollama ps` → kolumna `PROCESSOR` powinna pokazywać `100% GPU`
 
 Jeśli używa tylko CPU — model jest za duży na Twój RAM. Pobierz mniejszy lub bardziej skwantyzowany (np. `Q4_K_M` zamiast `Q8_0`).
 
 ### "Nie mam miejsca na dysku"
 Modele zajmują 2–10 GB. Domyślne lokalizacje:
-- **LM Studio:** `~/lmstudio-models` (można zmienić w ustawieniach)
+- **LM Studio:** `~/.lmstudio/models` (można zmienić w ustawieniach)
 - **Ollama (macOS):** `~/.ollama/models`
 - **Ollama (Windows):** `C:\Users\<user>\.ollama\models`
+
+### Model „zapomina” narzędzia albo polecenie przy dłuższej rozmowie
+Domyślne okno kontekstu w LM Studio to 4096 tokenów, a prompty na warsztatach mają 5–7 tys. — nadmiar jest po cichu obcinany. Przy ładowaniu modelu ustaw **Context Length ≥ 8192** (z terminala: `lms load <model> --context-length 8192`). W Ollamie: ustawienie *Context length* w aplikacji albo zmienna `OLLAMA_CONTEXT_LENGTH=8192`.
 
 ### Port jest zajęty
 Jeśli masz uruchomione i LM Studio i Ollamę równocześnie, ich porty (1234 i 11434) nie kolidują — możesz mieć oba aktywne.

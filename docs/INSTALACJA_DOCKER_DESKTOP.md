@@ -6,7 +6,7 @@ Docker Desktop to aplikacja, która pozwala uruchamiać kontenery (gotowe, zamkn
 ## Windows
 
 ### Wymagania
-- Windows 10 (wersja 1903+) lub Windows 11
+- Windows 10 (wersja 22H2) lub Windows 11
 - Włączony WSL2 (Windows Subsystem for Linux)
 
 ### Krok 1: Włączenie WSL2

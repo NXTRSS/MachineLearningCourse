@@ -7,9 +7,9 @@ Uruchomienie:
     python chat_demo.py --backend ollama              # wymuś Ollamę (pomiń LM Studio)
     python chat_demo.py --backend ollama -m e4b       # Ollama + konkretny model
     python chat_demo.py --port 4242                   # konkretny port LM Studio
-    python chat_demo.py --port 4242 --api-key alk-2026  # LM Studio z kluczem API
+    python chat_demo.py --port 4242 --api-key <hasło>   # LM Studio z kluczem API
     python chat_demo.py --server http://192.168.1.50:4242  # serwer prowadzącego (LAN)
-    python chat_demo.py -s http://192.168.1.50:4242 -k alk-2026  # serwer + hasło
+    python chat_demo.py -s http://192.168.1.50:4242 -k <hasło>  # serwer + hasło
     python chat_demo.py --model gemma                 # partial match na nazwie modelu
 
 Otwiera w przeglądarce interfejs ChatGPT-like z:
@@ -31,7 +31,7 @@ from pathlib import Path
 import requests
 from pydantic import BaseModel, Field
 
-from utils import connect_llm, ensure_package
+from utils import connect_llm, ensure_package, pick_best_model
 
 ensure_package("ddgs")
 ensure_package("wikipedia")
@@ -47,8 +47,8 @@ parser.add_argument("--port", "-p", type=int, default=None,
 parser.add_argument("--server", "-s", type=str, default=None,
                     help="Pełny URL serwera prowadzącego (np. 'http://192.168.1.50:4242')")
 parser.add_argument("--backend", "-b", type=str, default=None,
-                    choices=["ollama", "lmstudio"],
-                    help="Wymuszony backend: 'ollama' lub 'lmstudio' (domyślnie: auto-detect)")
+                    choices=["ollama", "lmstudio", "lecturer"],
+                    help="Wymuszony backend: 'ollama', 'lmstudio' lub 'lecturer' (domyślnie: auto-detect)")
 parser.add_argument("--api-key", "-k", type=str, default=None,
                     help="API key do serwera LLM (np. LM Studio z auth)")
 parser.add_argument("--reasoning", "-r", type=str, default="all",
@@ -57,6 +57,9 @@ parser.add_argument("--reasoning", "-r", type=str, default="all",
 args = parser.parse_args()
 
 # ── Połączenie z LLM ─────────────────────────────────────────────────
+
+_needs_gui_auth = False   # używane w __main__ niezależnie od gałęzi poniżej
+base_url = None
 
 if args.port or args.server:
     # Bezpośrednie połączenie: --port (localhost) lub --server (pełny URL)
@@ -106,7 +109,8 @@ if args.port or args.server:
                 _needs_gui_auth = True
                 print("🔑 Serwer wymaga hasła — podasz je w przeglądarce.")
 
-    MODEL_NAME = models[0] if models else "unknown"
+    # pick_best_model: preferuje model kursowy i pomija np. modele embeddingowe na początku listy
+    MODEL_NAME = (pick_best_model([m for m in models if "embed" not in m.lower()]) or models[0]) if models else "unknown"
     instructor_client = instructor.from_openai(client, mode=instructor.Mode.MD_JSON)
 else:
     LECTURER_SERVER = "http://ADRES_SERWERA:PORT"
@@ -184,6 +188,8 @@ def calculate(expression: str) -> str:
             "sqrt": math.sqrt, "sin": math.sin, "cos": math.cos,
             "pi": math.pi, "abs": abs, "round": round, "pow": pow,
         }
+        # Uwaga dydaktyczna: eval na tekście od LLM-a to wektor prompt injection / RCE
+        # (pusty __builtins__ NIE jest sandboxem). W produkcji użyj parsera AST lub simpleeval.
         result = eval(expression, {"__builtins__": {}}, allowed)
         return f"{expression} = {result}"
     except Exception as e:
@@ -439,13 +445,26 @@ if __name__ == "__main__":
     _auth_callback = None
     if _needs_gui_auth:
         def _auth_callback(_username, password):
-            """Gradio auth: zwraca nowego klienta (sukces) lub False (błąd)."""
+            """Gradio auth: zwraca nowego klienta (sukces) lub False (błąd).
+
+            Hasło sprawdzamy krótkim zapytaniem do /chat/completions — /v1/models
+            proxy przepuszcza bez hasła, więc models.list() przyjąłby każde hasło.
+            """
             from openai import OpenAI
+            from urllib.parse import quote
+            new_client = OpenAI(
+                base_url=base_url,
+                api_key=(password or "").strip() or "no-key",
+                default_headers={"X-Student-Name": quote(_username.strip() or "Anonim", safe=" -_.")},
+                max_retries=0,
+            )
             try:
-                new_client = OpenAI(base_url=base_url, api_key=password)
-                new_client.models.list()  # test połączenia
+                new_client.chat.completions.create(
+                    model=MODEL_NAME, messages=[{"role": "user", "content": "test"}], max_tokens=1,
+                )
                 return new_client  # sukces → nowy klient
-            except Exception:
+            except Exception as e:
+                print(f"🔑 Logowanie odrzucone: {e}")
                 return False
 
     # Proxy / serwer zdalny → pytaj o imię w Gradio

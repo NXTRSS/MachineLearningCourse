@@ -85,7 +85,7 @@ cd MachineLearningCourse
 > 2. Kliknij zielony przycisk **Code** → **Download ZIP**
 > 3. Wypakuj archiwum i otwórz terminal w tym folderze
 >
-> ⚠️ Bez Gita nie będziesz mógł pobierać aktualizacji materiałów (`git pull`).
+> ⚠️ Bez Gita nie da się pobierać aktualizacji materiałów (`git pull`).
 
 
 ## Krok 4: Stworzenie środowiska i instalacja pakietów
@@ -173,6 +173,13 @@ Zamknij i otwórz ponownie terminal po instalacji uv. Jeśli dalej nie działa, 
 TensorFlow 2.16+ ma pełne wsparcie dla Apple Silicon. Jeśli są problemy, spróbuj:
 ```bash
 uv sync --reinstall
+```
+
+### Mac z procesorem Intel — `uv sync` nie może znaleźć TensorFlow
+TensorFlow 2.20+ nie ma wersji dla Maców z procesorem Intel; ostatnia to **2.16.2** (Python 3.11 lub 3.12, też z Keras 3). `pyproject.toml` wybiera ją automatycznie na Intel Macu. Jeśli `uv sync` dalej zgłasza błąd, sprawdź, czy środowisko nie używa Pythona 3.13:
+```bash
+uv python pin 3.12
+uv sync
 ```
 
 ### "No module named..." przy uruchomieniu notebooka
